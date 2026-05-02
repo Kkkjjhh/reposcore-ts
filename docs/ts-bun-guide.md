@@ -140,6 +140,109 @@ bunx tsc --noEmit
 
 ---
 
+## 9. 테스트 프레임워크 및 라이브러리 선택 기준
+
+Bun은 기본적으로 `bun test`와 `bun:test` 모듈을 제공하므로,
+일반적인 TypeScript 단위 테스트는 별도의 테스트 프레임워크 없이 작성할 수 있습니다.
+
+Bun 내장 테스트 러너는 `describe`, `test`, `expect`와 같은 Jest 유사 API를 제공하며,
+TypeScript를 별도 컴파일 없이 바로 실행할 수 있습니다.
+
+---
+
+### Bun 내장 테스트 예시
+
+```ts
+import { describe, expect, test } from "bun:test";
+
+function add(a: number, b: number): number {
+  return a + b;
+}
+
+describe("add", () => {
+  test("두 숫자를 더한다", () => {
+    expect(add(1, 2)).toBe(3);
+  });
+});
+```
+
+### 상황별 테스트 도구 선택 기준
+
+| 목적           | 권장 도구           | 설명                        |
+| ------------ | --------------- | ------------------------- |
+| 단위 테스트       | Bun 내장 테스트 러너   | 함수, 클래스, CLI 로직 검증        |
+| Mocking      | `bun:test`      | mock, spy, module mock    |
+| UI/DOM 테스트   | Testing Library | 사용자 관점에서 UI 동작 검증         |
+| E2E 테스트      | Playwright      | 실제 브라우저 기반 End-to-End 테스트 |
+| Vite 기반 프로젝트 | Vitest          | Vite 환경에 최적화된 테스트 도구      |
+
+### 주요 테스트 도구
+
+#### 1. Bun 내장 테스트 러너 (기본 권장)
+
+```bash
+bun test
+```
+- 별도 설치 없이 사용 가능
+- TypeScript 직접 실행 지원
+- Jest 유사 API 제공
+
+👉 본 프로젝트에서는 기본적으로 Bun 테스트 러너 사용을 권장합니다.
+
+#### 2. Vitest
+
+```bash
+bun add -d vitest
+```
+```json
+{
+  "scripts": {
+    "test:vitest": "vitest"
+  }
+}
+```
+- Vite 기반 프로젝트에서 사용
+- 빠른 실행 속도와 HMR 지원
+- 프론트엔드 테스트에 적합
+
+#### 3. Testing Library
+
+```bash
+bun add -d @testing-library/dom
+```
+- DOM 및 UI 컴포넌트 테스트
+- 사용자 행동(click, input 등) 기반 검증
+
+#### 4. Playwright
+
+```bash
+bun add -d @playwright/test
+bunx playwright install
+```
+- 실제 브라우저 기반 테스트
+- 로그인, 페이지 이동 등 사용자 흐름 검증
+- E2E 테스트에 적합
+
+#### 5. Jest (참고)
+
+Bun은 Jest와 유사한 API(`describe`, `test`, `expect`)를 기본적으로 제공합니다.
+
+기존 Jest 기반 프로젝트를 Bun에서 실행할 수는 있지만,
+완전한 호환을 보장하지는 않습니다.
+
+👉 신규 프로젝트에서는 Bun 내장 테스트 러너 사용을 권장합니다.
+
+### 권장 사용 방식
+
+- 기본 단위 테스트 → Bun (bun test)
+- UI 테스트 → Testing Library
+- E2E 테스트 → Playwright
+- Vite 프로젝트 → Vitest
+
+프로젝트의 목적과 환경에 따라 적절한 도구를 선택하여 사용합니다.
+
+---
+
 ## 참고 자료
 
 - [Bun 공식 문서](https://bun.sh/docs)
