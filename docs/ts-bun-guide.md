@@ -5,7 +5,7 @@
 
 ---
 
-## 1. Bun이란?
+##  Bun이란?
 
 [Bun](https://bun.sh)은 JavaScript/TypeScript를 위한 고속 올인원 런타임입니다.
 Node.js 대신 TypeScript를 별도 컴파일 없이 직접 실행할 수 있으며,
@@ -13,7 +13,7 @@ Node.js 대신 TypeScript를 별도 컴파일 없이 직접 실행할 수 있으
 
 ---
 
-## 2. Codespaces에서 Bun 설치
+##  Codespaces에서 Bun 설치
 
 Codespaces 환경에는 Bun이 기본적으로 설치되어 있지 않습니다.
 터미널을 열고 아래 명령으로 설치합니다.
@@ -41,7 +41,7 @@ bun --version
 
 ---
 
-## 3. 의존성 설치
+##  의존성 설치
 
 프로젝트 루트 디렉터리에서 아래 명령을 실행합니다.
 
