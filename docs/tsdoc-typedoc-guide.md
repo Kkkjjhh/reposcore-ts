@@ -121,3 +121,12 @@ bunx typedoc index.ts
 - 공개 함수나 주요 타입에는 설명을 작성합니다.
 - 매개변수와 반환값이 있는 경우 `@param`, `@returns`를 작성합니다.
 - 불필요하게 긴 주석은 피하고 핵심만 작성합니다.
+
+---
+
+## 참고 자료
+
+- [TSDoc 공식 문서](https://tsdoc.org/)
+- [TypeDoc 공식 문서](https://typedoc.org/)
+- [TSDoc 공식 GitHub 저장소](https://github.com/microsoft/tsdoc)
+- [TypeDoc 공식 GitHub 저장소](https://github.com/TypeStrong/typedoc)
