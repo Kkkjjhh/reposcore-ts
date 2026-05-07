@@ -50,7 +50,7 @@ cli
 
     for (const repoPath of repos) {
       if (!repoPath.includes("/")) {
-        console.error(`오류: '${repoPath}'는 'owner/repo' 형식이 아닙니다. 건너뜜.`);
+        console.error(`오류: '${repoPath}'는 'owner/repo' 형식이 아닙니다. 건너뜀.`);
         continue;
       }
 
