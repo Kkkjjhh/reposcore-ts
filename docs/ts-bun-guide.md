@@ -57,7 +57,7 @@ bun install
 
 ---
 
-## 4. TypeScript 파일 실행
+##  TypeScript 파일 실행
 
 Bun은 TypeScript를 별도 컴파일 없이 직접 실행합니다.
 
@@ -73,7 +73,7 @@ bun run <스크립트명>
 
 ---
 
-## 5. 테스트 실행
+##  테스트 실행
 
 Bun 내장 테스트 러너를 사용합니다. Jest와 호환되는 API(`describe`, `test`, `expect`)를 그대로 사용할 수 있습니다.
 
@@ -93,7 +93,7 @@ Bun이 자동으로 감지하는 테스트 파일 규칙:
 
 ---
 
-## 6. 패키지 추가 / 제거
+##  패키지 추가 / 제거
 
 ```bash
 # 패키지 추가
@@ -108,7 +108,7 @@ bun remove <패키지명>
 
 ---
 
-## 7. tsconfig.json 주의사항
+##  tsconfig.json 주의사항
 
 본 프로젝트의 `tsconfig.json`은 Bun 환경에 맞게 설정되어 있습니다.
 
@@ -127,7 +127,7 @@ bunx tsc --noEmit
 
 ---
 
-## 8. 자주 사용하는 명령 요약
+##  자주 사용하는 명령 요약
 
 | 명령 | 설명 |
 |---|---|
@@ -140,7 +140,7 @@ bunx tsc --noEmit
 
 ---
 
-## 9. 테스트 프레임워크 및 라이브러리 선택 기준
+##  테스트 프레임워크 및 라이브러리 선택 기준
 
 Bun은 기본적으로 `bun test`와 `bun:test` 모듈을 제공하므로,
 일반적인 TypeScript 단위 테스트는 별도의 테스트 프레임워크 없이 작성할 수 있습니다.
@@ -178,7 +178,7 @@ describe("add", () => {
 
 ### 주요 테스트 도구
 
-#### 1. Bun 내장 테스트 러너 (기본 권장)
+####  Bun 내장 테스트 러너 (기본 권장)
 
 ```bash
 bun test
@@ -189,7 +189,7 @@ bun test
 
 👉 본 프로젝트에서는 기본적으로 Bun 테스트 러너 사용을 권장합니다.
 
-#### 2. Vitest
+####  Vitest
 
 ```bash
 bun add -d vitest
@@ -205,7 +205,7 @@ bun add -d vitest
 - 빠른 실행 속도와 HMR 지원
 - 프론트엔드 테스트에 적합
 
-#### 3. Testing Library
+####  Testing Library
 
 ```bash
 bun add -d @testing-library/dom
@@ -213,7 +213,7 @@ bun add -d @testing-library/dom
 - DOM 및 UI 컴포넌트 테스트
 - 사용자 행동(click, input 등) 기반 검증
 
-#### 4. Playwright
+####  Playwright
 
 ```bash
 bun add -d @playwright/test
@@ -223,7 +223,7 @@ bunx playwright install
 - 로그인, 페이지 이동 등 사용자 흐름 검증
 - E2E 테스트에 적합
 
-#### 5. Jest (참고)
+####  Jest (참고)
 
 Bun은 Jest와 유사한 API(`describe`, `test`, `expect`)를 기본적으로 제공합니다.
 
