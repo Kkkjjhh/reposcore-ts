@@ -16,19 +16,21 @@ const cli = cac("reposcore-ts");
 
 cli
   .command("[...repos]", "대상 저장소 목록 (예: owner/repo1 owner/repo2)")
-  .option(
-    "--token <token>",
-    "GitHub Personal Access Token (기본값: $GITHUB_TOKEN)",
-  )
-  .option("--format <format>", "출력 형식 (csv, txt)", { default: "csv" })
+  .option("--token <token>", "GitHub Personal Access Token", {
+    default: "$GITHUB_TOKEN",
+  })
+  .option("--format <format>", "출력 형식 (csv, txt)", {
+    default: "csv",
+  })
   .action(async (repos: string[], options: { token?: string; format: string }) => {
-    // 1. 토큰 체크 (process.exit 대신 return으로 흐름 제어)
-    const token = options.token ?? Bun.env.GITHUB_TOKEN;
+    const token =
+      options.token === "$GITHUB_TOKEN" ? Bun.env.GITHUB_TOKEN : options.token;
+
     if (!token) {
       console.error(
         "오류: GitHub 토큰이 필요합니다. --token 옵션 또는 GITHUB_TOKEN 환경 변수를 설정하세요.",
       );
-      return; 
+      return;
     }
 
     // 2. 저장소 입력 여부 확인

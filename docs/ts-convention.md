@@ -5,7 +5,7 @@
 
 ---
 
-##  네이밍 규칙
+## 네이밍 규칙
 
 | 대상 | 규칙 | 예시 |
 |---|---|---|
@@ -19,7 +19,7 @@
 
 ---
 
-##  타입 정의 방식 (interface vs type)
+## 타입 정의 방식 (interface vs type)
 
 - **interface** → 객체 형태의 타입 정의에 사용
 - **type** → 유니온, 인터섹션 등 복잡한 타입 정의에 사용
@@ -59,7 +59,7 @@ const getIssues = async (repo: string): Promise<Issue[]> => {
 
 ---
 
-## 4. import/export 규칙
+## import/export 규칙
 
 - **named export** 를 기본으로 사용합니다.
 - `index.ts` 에서 모듈을 한곳에 모아 re-export 합니다.
@@ -75,7 +75,7 @@ import { calculateScore, UserScore } from './score-calculator';
 
 ---
 
-## 5. 기본 코드 스타일
+## 기본 코드 스타일
 
 - 들여쓰기: **2 spaces**
 - 세미콜론: **항상 사용**
