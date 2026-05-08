@@ -1,6 +1,6 @@
 # TypeScript/Bun 기반 GitHub GraphQL 가이드
 
-## . 의존성 확인 및 설치
+## 의존성 확인 및 설치
 
 본 프로젝트에 이미 `@octokit/graphql`이 등록되어 있으므로 별도 설치 없이 아래 명령으로 의존성을 설치합니다.
 
@@ -10,7 +10,7 @@ bun install
 
 ---
 
-## . 기본 설정
+## 기본 설정
 
 `index.ts` 또는 별도 파일에 GitHub GraphQL 클라이언트를 설정합니다.
 
@@ -32,7 +32,7 @@ GITHUB_TOKEN=your_token bun run index.ts
 
 ---
 
-## . TypeScript 인터페이스로 응답 타입 정의
+## TypeScript 인터페이스로 응답 타입 정의
 
 GraphQL 응답 구조에 맞춰 타입을 정의합니다.
 
@@ -72,7 +72,7 @@ interface PullRequestsResponse {
 
 ---
 
-## 4-1. Issue 조회 예시
+## Issue 조회 예시
 
 ```ts
 const result = await githubGraphQL<IssuesResponse>(
@@ -102,7 +102,7 @@ console.log(result.repository.issues.nodes);
 
 ---
 
-## 4-2. Pull Request 조회 예시
+## Pull Request 조회 예시
 
 ```ts
 const result = await githubGraphQL<PullRequestsResponse>(
@@ -132,7 +132,7 @@ console.log(result.repository.pullRequests.nodes);
 
 ---
 
-## 4-3. Issue + PR 통합 조회
+## Issue + PR 통합 조회
 
 ```ts
 const result = await githubGraphQL(
@@ -161,7 +161,7 @@ const result = await githubGraphQL(
 
 ---
 
-## 5. 참고 문서
+## 참고 문서
 
 * GitHub GraphQL API
   [https://docs.github.com/graphql](https://docs.github.com/graphql)
