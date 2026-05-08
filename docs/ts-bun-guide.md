@@ -11,6 +11,8 @@
 Node.js 대신 TypeScript를 별도 컴파일 없이 직접 실행할 수 있으며,
 패키지 매니저(`bun install`), 테스트 러너(`bun test`), 번들러(`bun build`)를 모두 내장하고 있습니다.
 
+> **참고:** `bunx`는 `npx`와 유사한 패키지 실행 방식이며, 본 문서에서는 Bun 중심 개발 환경과 실행 방식의 일관성을 위해 `bun tsc` 기준 명령어를 사용합니다.
+
 ---
 
 ##  Codespaces에서 Bun 설치
@@ -119,12 +121,6 @@ bun remove <패키지명>
 | `types` | `["bun"]` | Bun 전용 타입(`Bun.file` 등) 사용 |
 | `noEmit` | `true` | Bun이 직접 실행하므로 JS 파일 출력 불필요 |
 
-타입 검사만 별도로 수행하려면 아래 명령을 사용합니다.
-
-```bash
-bunx tsc --noEmit
-```
-
 ---
 
 ##  자주 사용하는 명령 요약
@@ -137,6 +133,9 @@ bunx tsc --noEmit
 | `bun add <pkg>` | 패키지 추가 |
 | `bun remove <pkg>` | 패키지 제거 |
 | `bunx tsc --noEmit` | 타입 검사만 수행 |
+
+> **참고:** 현재 프로젝트에서는 별도 script 설정 없이 TypeScript CLI를 실행하기 위해 `bunx tsc --noEmit`을 사용합니다.
+> **추후** `package.json`에 script가 추가되면 `bun tsc --noEmit` 방식으로 통일할 수 있습니다.
 
 ---
 
