@@ -34,9 +34,6 @@ coverage
 # Grunt intermediate storage (https://gruntjs.com/creating-plugins#storing-task-files)
 .grunt
 
-# Bower dependency directory (https://bower.io/)
-bower_components
-
 # node-waf configuration
 .lock-wscript
 
@@ -45,7 +42,6 @@ build/Release
 
 # Dependency directories
 node_modules/
-jspm_packages/
 
 # TypeScript v1 declaration files
 typings/
@@ -108,3 +104,11 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Bun
+bun-debug.log*
+.bun/
+
+# Local environment variables
+.env.local
+.env.*.local
