@@ -1,5 +1,16 @@
+import { graphql } from "@octokit/graphql";
 import { cac } from "cac";
-import { createGitHubService } from "./github-service";
+
+interface RepositoryStatsResponse {
+  repository: {
+    issues: {
+      totalCount: number;
+    };
+    pullRequests: {
+      totalCount: number;
+    };
+  };
+}
 
 const cli = cac("reposcore-ts");
 
@@ -22,6 +33,7 @@ cli
       return;
     }
 
+    // 저장소 입력 여부 확인
     if (repos.length === 0) {
       console.error("오류: 최소 하나 이상의 저장소(owner/repo)를 입력해야 합니다.");
       cli.outputHelp();
@@ -32,24 +44,44 @@ cli
     console.log(`저장소: ${repos.join(", ")}`);
     console.log(`형식: ${options.format}`);
 
-    const githubService = createGitHubService(token);
+    const githubGraphQL = graphql.defaults({
+      headers: {
+        authorization: `token ${token}`,
+      },
+    });
 
     for (const repoPath of repos) {
-      if (!repoPath.includes("/")) {
+      const parts = repoPath.split("/");
+
+      if (parts.length !== 2 || !parts[0] || !parts[1]) {
         console.error(`오류: '${repoPath}'는 'owner/repo' 형식이 아닙니다. 건너뜀.`);
         continue;
       }
 
-      const [owner, repoName] = repoPath.split("/") as [string, string];
+      const [owner, repoName] = parts;
 
       try {
-        const stats = await githubService.getRepoStats(owner, repoName);
+        const result = await githubGraphQL<RepositoryStatsResponse>(
+          `
+          query($owner: String!, $repo: String!) {
+            repository(owner: $owner, name: $repo) {
+              issues { totalCount }
+              pullRequests { totalCount }
+            }
+          }
+          `,
+          { owner, repo: repoName },
+        );
 
-        console.log(`[${repoPath}] 이슈: ${stats.issues}, PR: ${stats.pullRequests}`);
+        console.log(
+          `[${repoPath}] 이슈: ${result.repository.issues.totalCount}, PR: ${result.repository.pullRequests.totalCount}`,
+        );
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
+
         console.error(`오류: '${repoPath}'의 데이터를 가져올 수 없습니다.`);
         console.error(`상세 원인: ${errorMessage}`);
+
         process.exit(1);
       }
     }
