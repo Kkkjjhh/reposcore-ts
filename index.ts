@@ -35,12 +35,14 @@ cli
     const githubService = createGitHubService(token);
 
     for (const repoPath of repos) {
-      if (!repoPath.includes("/")) {
+      const parts = repoPath.split("/");
+
+      if (parts.length !== 2 || !parts[0] || !parts[1]) {
         console.error(`오류: '${repoPath}'는 'owner/repo' 형식이 아닙니다. 건너뜀.`);
         continue;
       }
 
-      const [owner, repoName] = repoPath.split("/") as [string, string];
+      const [owner, repoName] = parts;
 
       try {
         const stats = await githubService.getRepoStats(owner, repoName);
