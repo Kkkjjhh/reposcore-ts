@@ -1,5 +1,5 @@
 import {cac} from 'cac';
-import {createGitHubService} from './github-service';
+import {countByCategory, createGitHubService} from './github-service';
 
 const cli = cac('reposcore-ts');
 
@@ -90,11 +90,28 @@ cli
 
       for (const {repoPath, owner, repoName} of parsedRepos) {
         try {
-          const stats = await githubService.getRepoStats(owner, repoName);
+          const [stats, detailed] = await Promise.all([
+            githubService.getRepoStats(owner, repoName),
+            githubService.getDetailedRepoData(owner, repoName),
+          ]);
 
           console.log(
             `[${repoPath}] 이슈: ${stats.issues}, PR: ${stats.pullRequests}`,
           );
+
+          if (format === 'txt') {
+            const prCounts = countByCategory(detailed.prs);
+            const issueCounts = countByCategory(detailed.issues);
+            const featurePrCount = prCounts.feature + prCounts.bug;
+            const featureIssueCount = issueCounts.feature + issueCounts.bug;
+            console.log(`[${repoPath}]`);
+            console.log(
+              `Merged PRs - feature: ${featurePrCount}, docs: ${prCounts.doc}, typo: ${prCounts.typo}`,
+            );
+            console.log(
+              `Closed Issues - feature: ${featureIssueCount}, docs: ${issueCounts.doc}`,
+            );
+          }
         } catch (error: unknown) {
           const errorMessage =
             error instanceof Error ? error.message : String(error);
