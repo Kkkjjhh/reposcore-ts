@@ -93,3 +93,6 @@ bun-debug.log*
 
 # IDE
 .vscode/
+
+# 실수로 npm 같은 거 돌려서 나오는 파일 무시
+package-lock.json
