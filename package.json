@@ -6,7 +6,8 @@
   "scripts": {
     "start": "bun run index.ts",
     "lint": "gts lint",
-    "fix": "gts fix"
+    "fix": "gts fix",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",

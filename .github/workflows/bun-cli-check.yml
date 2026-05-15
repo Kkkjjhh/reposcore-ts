@@ -15,4 +15,6 @@ jobs:
 
       - run: bun install
 
+      - run: bun run typecheck
+
       - run: bun run index.ts --help
