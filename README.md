@@ -25,6 +25,7 @@ bun run index.ts oss2026hnu/reposcore-ts --token YOUR_GITHUB_TOKEN
 
 ## Synopsis
 
+<!-- SYNOPSIS_START -->
 ```text
 reposcore-ts
 
@@ -34,8 +35,12 @@ Usage:
 Commands:
   [...repos]  대상 저장소 목록 (예: owner/repo1 owner/repo2)
 
+For more info, run any command with the `--help` flag:
+  $ reposcore-ts --help
+
 Options:
   --token <token>    GitHub Personal Access Token (default: $GITHUB_TOKEN)
   --format <format>  출력 형식 (csv, txt) (default: csv)
   -h, --help         Display this message
 ```
+<!-- SYNOPSIS_END -->
