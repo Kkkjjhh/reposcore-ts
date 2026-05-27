@@ -1,5 +1,8 @@
 import type {DetailedRepoData} from './types';
 
+/**
+ * 사용자별 이슈와 PR 기여 개수를 나타내는 점수 계산용 데이터입니다.
+ */
 export interface IssuePrData {
   userId: string;
   prFeatureBug: number;
@@ -9,18 +12,27 @@ export interface IssuePrData {
   issueDocs: number;
 }
 
+/**
+ * 저장소별 점수 계산 데이터를 나타냅니다.
+ */
 export interface RepoData {
   owner: string;
   repo: string;
   scoreData: IssuePrData[];
 }
 
+/**
+ * 사용자별 저장소 점수와 최종 합산 점수를 나타냅니다.
+ */
 export interface UserScore {
   userId: string;
   repoScores: RepoData[];
   totalScore: number;
 }
 
+/**
+ * 저장소의 이슈와 PR 데이터를 기반으로 사용자별 기여 점수를 계산하는 클래스입니다.
+ */
 export class ScoreCalculator {
   private static readonly PR_FEATURE_BUG_WEIGHT = 3;
   private static readonly PR_DOCS_WEIGHT = 2;
@@ -28,9 +40,15 @@ export class ScoreCalculator {
   private static readonly ISSUE_FEATURE_BUG_WEIGHT = 2;
   private static readonly ISSUE_DOCS_WEIGHT = 1;
 
-  // 저장소의 이슈와 PR을 사용자별 IssuePrData 리스트로 변환합니다.
-  // category === 'none'(미인식 라벨)인 항목은 점수 산정 대상이 아니므로 건너뜁니다.
-  // author가 없는 경우(삭제된 사용자/봇)는 'unknown'으로 매핑합니다.
+  /**
+   * 저장소의 이슈와 PR 데이터를 사용자별 점수 계산 데이터로 변환합니다.
+   *
+   * category가 'none'인 항목은 점수 산정 대상에서 제외하고,
+   * 작성자가 없는 경우 사용자 ID를 'unknown'으로 처리합니다.
+   *
+   * @param repo 이슈와 PR 목록을 포함한 저장소 상세 데이터
+   * @returns 사용자별 Issue/PR 집계 데이터 목록
+   */
   static buildIssuePrData(repo: DetailedRepoData): IssuePrData[] {
     const bucket = new Map<string, IssuePrData>();
 
@@ -77,7 +95,14 @@ export class ScoreCalculator {
     return Array.from(bucket.values());
   }
 
-  // DetailedRepoData를 RepoData로 변환하여 저장소별 scoreData를 만듭니다.
+  /**
+   * 상세 저장소 데이터를 저장소별 점수 계산 데이터로 변환합니다.
+   *
+   * @param detailed GitHub에서 수집한 저장소 상세 데이터
+   * @param owner 저장소 소유자 이름
+   * @param repo 저장소 이름
+   * @returns 저장소별 점수 계산 데이터
+   */
   static calculateRepoData(
     detailed: DetailedRepoData,
     owner: string,
@@ -90,14 +115,25 @@ export class ScoreCalculator {
     };
   }
 
-  // 주어진 IssuePrData에서 유효 PR 개수를 계산합니다.
+  /**
+   * 주어진 사용자 기여 데이터에서 점수 산정에 반영할 유효 PR 개수를 계산합니다.
+   *
+   * @param data 사용자별 이슈와 PR 기여 데이터
+   * @returns 점수 산정에 반영되는 유효 PR 개수
+   */
   private static calculateValidPrCount(data: IssuePrData): number {
     const pFb = data.prFeatureBug;
     const pDocsAndTypo = data.prDocs + data.prTypo;
     return pFb + Math.min(pDocsAndTypo, 3 * Math.max(pFb, 1));
   }
 
-  // 주어진 IssuePrData와 유효 PR 개수를 기반으로 유효 이슈 개수를 계산합니다.
+  /**
+   * 사용자 기여 데이터와 유효 PR 개수를 기반으로 점수 산정에 반영할 유효 이슈 개수를 계산합니다.
+   *
+   * @param data 사용자별 이슈와 PR 기여 데이터
+   * @param validPrCount 점수 산정에 반영되는 유효 PR 개수
+   * @returns 점수 산정에 반영되는 유효 이슈 개수
+   */
   private static calculateValidIssueCount(
     data: IssuePrData,
     validPrCount: number,
@@ -106,7 +142,12 @@ export class ScoreCalculator {
     return Math.min(totalIssues, 4 * validPrCount);
   }
 
-  // IssuePrData를 받아 최종 기여 점수를 계산합니다.
+  /**
+   * 사용자별 기여 데이터를 기반으로 최종 기여 점수를 계산합니다.
+   *
+   * @param data 사용자별 이슈와 PR 기여 데이터
+   * @returns 계산된 최종 기여 점수
+   */
   private static calculateFinalScore(data: IssuePrData): number {
     const validPrCount = ScoreCalculator.calculateValidPrCount(data);
     const validIssueCount = ScoreCalculator.calculateValidIssueCount(
@@ -136,7 +177,12 @@ export class ScoreCalculator {
     );
   }
 
-  // 여러 저장소 RepoData를 받아 사용자별 점수를 집계합니다.
+  /**
+   * 여러 저장소의 점수 계산 데이터를 사용자별로 집계하고 최종 점수를 계산합니다.
+   *
+   * @param repos 저장소별 점수 계산 데이터 목록
+   * @returns 사용자별 저장소 점수와 최종 합산 점수 목록
+   */
   static calculateUserScores(repos: RepoData[]): UserScore[] {
     const byUser = new Map<string, RepoData[]>();
 
