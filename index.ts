@@ -155,21 +155,19 @@ cli
         }
       }
 
-      if (parsedRepos.length >= 2) {
-        const userScores = ScoreCalculator.calculateUserScores(repoDataList);
+      const userScores = ScoreCalculator.calculateUserScores(repoDataList);
 
-        const written = await writeOutputFiles(
-          format as SupportedFormat,
-          {
-            userScores,
-            repoSummaries,
-          },
-          outputDir,
-        );
-        console.error(`[합산] CSV 저장: ${written.csv}`);
-        if ('txt' in written) {
-          console.error(`[합산] TXT 저장: ${written.txt}`);
-        }
+      const written = await writeOutputFiles(
+        format as SupportedFormat,
+        {
+          userScores,
+          repoSummaries,
+        },
+        outputDir,
+      );
+      console.error(`[합산] CSV 저장: ${written.csv}`);
+      if ('txt' in written) {
+        console.error(`[합산] TXT 저장: ${written.txt}`);
       }
     },
   );
