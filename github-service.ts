@@ -164,7 +164,7 @@ export const createGitHubService = (token: string) => {
    * @param repo 저장소 이름
    * @returns 가공된 전체 IssueRecord 데이터 배열
    */
-  const getAllIssues = async (
+  const getAllValidIssues = async (
     owner: string,
     repo: string,
   ): Promise<IssueRecord[]> => {
@@ -213,9 +213,9 @@ export const createGitHubService = (token: string) => {
       const connection: IssuePageResponse['repository']['issues'] =
         response.repository.issues;
 
-      // 'not planned'와 'duplicate' 사유로 닫힌 이슈를 필터링합니다.
+      // OPEN 상태이거나 CLOSE된 상태 중에서도 정상적으로 종료된(COMPLETED) 이슈만 유효한 데이터로 필터링합니다.
       const validNodes = connection.nodes.filter(
-        node => node.stateReason === 'COMPLETED'
+        node => node.state === 'OPEN' || node.stateReason === 'COMPLETED'
       );
 
       issues.push(...validNodes.map(toIssueRecord));
@@ -315,7 +315,7 @@ export const createGitHubService = (token: string) => {
     if (cached) return cached.data;
 
     const [issues, prs] = await Promise.all([
-      getAllIssues(owner, repo),
+      getAllValidIssues(owner, repo),
       getAllMergedPullRequests(owner, repo),
     ]);
 
