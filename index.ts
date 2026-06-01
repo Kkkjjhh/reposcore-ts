@@ -2,9 +2,23 @@ import {cac} from 'cac';
 import pkg from './package.json' with {type: 'json'};
 
 import {createGitHubService} from './src/services/github-service';
-import {ScoreCalculator, type RepoData} from './src/core/score-calculator';
-import {summarizeRepo, writeOutputFiles} from './src/utils/output';
-import type {RepoSummary} from './src/utils/output';
+import {
+  ScoreCalculator,
+  type RepoData,
+  type UserScore,
+} from './src/core/score-calculator';
+import {
+  summarizeRepo,
+  writeOutputFiles,
+  type RepoSummary,
+} from './src/utils/output';
+import {
+  sortUserScores,
+  supportedSortBys,
+  supportedSortOrders,
+  type SupportedSortBy,
+  type SupportedSortOrder,
+} from './src/utils/sort';
 
 const cli = cac('reposcore-ts');
 cli.version(pkg.version);
@@ -37,6 +51,12 @@ cli
     default: 'output',
   })
   .option('--no-cache', '캐시를 무시하고 GitHub API를 새로 호출합니다')
+  .option('--sort-by <field>', '정렬 기준 (score, id)', {
+    default: 'score',
+  })
+  .option('--sort-order <order>', '정렬 방식 (asc, desc)', {
+    default: 'desc',
+  })
   .action(
     async (
       repos: string[],
@@ -45,6 +65,8 @@ cli
         format: string;
         cache: boolean;
         outputDir?: string;
+        sortBy: string;
+        sortOrder: string;
       },
     ) => {
       const token =
@@ -54,6 +76,8 @@ cli
       const format = String(options.format || '').toLowerCase();
       const useCache = options.cache; // --no-cache 전달 시 false
       const outputDir = options.outputDir || 'output';
+      const sortBy = String(options.sortBy || 'score').toLowerCase();
+      const sortOrder = String(options.sortOrder || 'desc').toLowerCase();
       const errors: string[] = [];
       const parsedRepos: {
         repoPath: string;
@@ -70,6 +94,18 @@ cli
       if (!supportedFormats.includes(format as SupportedFormat)) {
         errors.push(
           `오류: 지원하지 않는 출력 형식 '${options.format}'입니다. csv 또는 txt를 입력하세요.`,
+        );
+      }
+
+      if (!supportedSortBys.includes(sortBy as SupportedSortBy)) {
+        errors.push(
+          `오류: 지원하지 않는 정렬 기준 '${options.sortBy}'입니다. score 또는 id를 입력하세요.`,
+        );
+      }
+
+      if (!supportedSortOrders.includes(sortOrder as SupportedSortOrder)) {
+        errors.push(
+          `오류: 지원하지 않는 정렬 방식 '${options.sortOrder}'입니다. asc 또는 desc를 입력하세요.`,
         );
       }
 
@@ -128,9 +164,12 @@ cli
           repoDataList.push(repoData);
           repoSummaries.push(repoSummary);
 
-          const singleUserScores = ScoreCalculator.calculateUserScores([
-            repoData,
-          ]);
+          const singleUserScores = sortUserScores(
+            ScoreCalculator.calculateUserScores([repoData]),
+            sortBy as SupportedSortBy,
+            sortOrder as SupportedSortOrder,
+          );
+
           const subDir = `${owner}-${repoName}`;
           const written = await writeOutputFiles(
             format as SupportedFormat,
@@ -155,7 +194,11 @@ cli
         }
       }
 
-      const userScores = ScoreCalculator.calculateUserScores(repoDataList);
+      const userScores = sortUserScores(
+        ScoreCalculator.calculateUserScores(repoDataList),
+        sortBy as SupportedSortBy,
+        sortOrder as SupportedSortOrder,
+      );
 
       const written = await writeOutputFiles(
         format as SupportedFormat,
