@@ -1,4 +1,4 @@
-import type {UserScore} from '../core/score-calculator';
+import type {UserScore} from '../score-calculator';
 
 export const supportedSortBys = ['score', 'id'] as const;
 export type SupportedSortBy = (typeof supportedSortBys)[number];

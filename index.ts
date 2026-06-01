@@ -1,24 +1,23 @@
 import {cac} from 'cac';
 import pkg from './package.json' with {type: 'json'};
 
-import {createGitHubService} from './src/services/github-service';
+import {createGitHubService} from './src/github-service';
 import {
   ScoreCalculator,
   type RepoData,
-  type UserScore,
-} from './src/core/score-calculator';
+} from './src/score-calculator';
 import {
   summarizeRepo,
   writeOutputFiles,
   type RepoSummary,
-} from './src/utils/output';
+} from './src/output';
 import {
   sortUserScores,
   supportedSortBys,
   supportedSortOrders,
   type SupportedSortBy,
   type SupportedSortOrder,
-} from './src/utils/sort';
+} from './src/sort';
 
 const cli = cac('reposcore-ts');
 cli.version(pkg.version);
