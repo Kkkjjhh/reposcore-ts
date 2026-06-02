@@ -47,7 +47,7 @@ Options:
   --no-cache            캐시를 무시하고 GitHub API를 새로 호출합니다 (default: true)
   --sort-by <field>     정렬 기준 (score, id) (default: score)
   --sort-order <order>  정렬 방식 (asc, desc) (default: desc)
-  -v, --version         Display version number
+  -v, --version         Display version number 
   -h, --help            Display this message
 ```
 
