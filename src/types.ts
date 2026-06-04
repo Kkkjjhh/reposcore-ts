@@ -91,6 +91,7 @@ export interface ClaimInfo {
   url: string;
   claimedBy: string | null;
   matchedKeyword: string | null;
+  claimedAt: string | null;
 }
 
 /** 저장소별 선점 현황 */
