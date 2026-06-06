@@ -161,6 +161,231 @@ const result = await githubGraphQL(
 
 ---
 
+## Cursor pagination으로 여러 페이지 조회하기
+
+GitHub GraphQL 연결(connection) 필드는 한 번에 가져올 수 있는 개수에 제한이 있습니다.
+예를 들어 `issues(first: 100)` 또는 `pullRequests(first: 100)`처럼 조회하면 최대 100개까지만 가져올 수 있습니다.
+
+저장소에 closed issue 또는 merged pull request가 100개를 초과하는 경우에는 `pageInfo.hasNextPage`와 `pageInfo.endCursor`를 사용하여 다음 페이지를 반복 조회해야 합니다.
+
+### pageInfo 구조
+
+```ts
+interface PageInfo {
+  hasNextPage: boolean;
+  endCursor: string | null;
+}
+```
+
+`hasNextPage`는 다음 페이지가 있는지 여부를 나타내고, `endCursor`는 다음 요청에서 `after` 값으로 전달할 cursor입니다.
+
+### Issue pagination 예시
+
+```ts
+interface IssueNode {
+  number: number;
+  title: string;
+  url: string;
+  closedAt: string | null;
+  author: {login: string} | null;
+}
+
+interface IssuePageResponse {
+  repository: {
+    issues: {
+      nodes: IssueNode[];
+      pageInfo: PageInfo;
+    };
+  };
+}
+
+const getAllClosedIssues = async (owner: string, repo: string) => {
+  const issues: IssueNode[] = [];
+  let cursor: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response = await githubGraphQL<IssuePageResponse>(
+      `
+      query($owner: String!, $repo: String!, $cursor: String) {
+        repository(owner: $owner, name: $repo) {
+          issues(first: 100, after: $cursor, states: CLOSED) {
+            nodes {
+              number
+              title
+              url
+              closedAt
+              author { login }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      }
+      `,
+      {owner, repo, cursor},
+    );
+
+    const connection = response.repository.issues;
+    issues.push(...connection.nodes);
+
+    cursor = connection.pageInfo.endCursor;
+    hasNextPage = connection.pageInfo.hasNextPage && cursor !== null;
+  }
+
+  return issues;
+};
+```
+
+### Pull Request pagination 예시
+
+Issue와 PR은 각각 별도의 connection을 사용하므로 `hasNextPage`와 `endCursor`도 독립적으로 관리해야 합니다.
+
+```ts
+interface PullRequestNode {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string | null;
+  author: {login: string} | null;
+}
+
+interface PullRequestPageResponse {
+  repository: {
+    pullRequests: {
+      nodes: PullRequestNode[];
+      pageInfo: PageInfo;
+    };
+  };
+}
+
+const getAllMergedPullRequests = async (owner: string, repo: string) => {
+  const pullRequests: PullRequestNode[] = [];
+  let cursor: string | null = null;
+  let hasNextPage = true;
+
+  while (hasNextPage) {
+    const response = await githubGraphQL<PullRequestPageResponse>(
+      `
+      query($owner: String!, $repo: String!, $cursor: String) {
+        repository(owner: $owner, name: $repo) {
+          pullRequests(first: 100, after: $cursor, states: MERGED) {
+            nodes {
+              number
+              title
+              url
+              mergedAt
+              author { login }
+            }
+            pageInfo {
+              hasNextPage
+              endCursor
+            }
+          }
+        }
+      }
+      `,
+      {owner, repo, cursor},
+    );
+
+    const connection = response.repository.pullRequests;
+    pullRequests.push(...connection.nodes);
+
+    cursor = connection.pageInfo.endCursor;
+    hasNextPage = connection.pageInfo.hasNextPage && cursor !== null;
+  }
+
+  return pullRequests;
+};
+```
+
+---
+
+## Search query 기반 증분 조회
+
+전체 데이터를 매번 다시 가져오면 API 요청 수가 증가하고 실행 시간이 길어질 수 있습니다.
+이미 분석한 캐시가 있다면 마지막 분석 시각 이후 변경된 issue 또는 pull request만 다시 조회하는 방식으로 요청량을 줄일 수 있습니다.
+
+GitHub search query에서는 `updated:>=YYYY-MM-DD` 조건을 사용할 수 있습니다.
+
+### Issue 변경분 조회 예시
+
+```ts
+const query = `repo:${owner}/${repo} is:issue updated:>=${sinceDate}`;
+```
+
+예를 들어 `sinceDate`가 `2026-06-01`이면 다음과 같은 검색 조건이 됩니다.
+
+```text
+repo:oss2026hnu/reposcore-ts is:issue updated:>=2026-06-01
+```
+
+### Pull Request 변경분 조회 예시
+
+```ts
+const query = `repo:${owner}/${repo} is:pr updated:>=${sinceDate}`;
+```
+
+GitHub GraphQL의 `search` 필드를 사용할 때는 `query` 문자열을 변수로 전달할 수 있습니다.
+
+```ts
+interface SearchPageResponse {
+  search: {
+    nodes: Array<{
+      number: number;
+      title: string;
+      url: string;
+      author: {login: string} | null;
+    }>;
+    pageInfo: PageInfo;
+  };
+}
+
+const searchUpdatedIssues = async (owner: string, repo: string, sinceDate: string) => {
+  const queryText = `repo:${owner}/${repo} is:issue updated:>=${sinceDate}`;
+
+  const response = await githubGraphQL<SearchPageResponse>(
+    `
+    query($queryText: String!) {
+      search(query: $queryText, type: ISSUE, first: 100) {
+        nodes {
+          ... on Issue {
+            number
+            title
+            url
+            author { login }
+          }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
+      }
+    }
+    `,
+    {queryText},
+  );
+
+  return response.search.nodes;
+};
+```
+
+### 캐시 시각과 증분 조회 흐름
+
+캐시에 마지막 분석 시각인 `lastAnalyzedAt`이 저장되어 있다면 다음과 같은 흐름으로 증분 조회를 구성할 수 있습니다.
+
+1. 캐시에서 `lastAnalyzedAt`을 읽습니다.
+2. 값이 없으면 전체 데이터를 조회합니다.
+3. 값이 있으면 `updated:>=YYYY-MM-DD` 조건으로 변경된 issue/PR만 검색합니다.
+4. 검색 결과를 기존 캐시 데이터에 반영합니다.
+5. 분석이 끝나면 현재 시각을 새로운 `lastAnalyzedAt`으로 저장합니다.
+
+이 방식은 전체 재조회보다 요청량을 줄일 수 있지만, 검색 쿼리 조건과 캐시 병합 로직을 함께 신중하게 관리해야 합니다.
+
+---
+
 ## 비동기 병렬 요청 처리
 
 ### 순차 await 방식의 문제점
@@ -173,7 +398,7 @@ const pullRequests = await fetchPRs(); // issues가 끝난 후 시작
 const commits = await fetchCommits(); // pullRequests가 끝난 후 시작
 ```
 
-각 요청이 독립적임에도 불구하고 직렬로 실행되므로, 전체 실행 시간은 각 요청 시간의 합이 됩니다.  
+각 요청이 독립적임에도 불구하고 직렬로 실행되므로, 전체 실행 시간은 각 요청 시간의 합이 됩니다.
 예를 들어 각각 200ms가 걸린다면 총 600ms 이상이 소요됩니다.
 
 ---
@@ -190,7 +415,7 @@ const [issues, pullRequests, commits] = await Promise.all([
 ]);
 ```
 
-세 요청이 동시에 시작되므로, 전체 실행 시간은 가장 오래 걸리는 요청 하나의 시간과 비슷해집니다.  
+세 요청이 동시에 시작되므로, 전체 실행 시간은 가장 오래 걸리는 요청 하나의 시간과 비슷해집니다.
 위 예시에서는 약 200ms 수준으로 단축됩니다.
 
 ---
@@ -272,7 +497,7 @@ const [issuesResult, prsResult, commitsResult] = await Promise.all([
 
 **에러 처리**
 
-`Promise.all()`은 하나의 요청이라도 실패하면 전체가 reject됩니다.  
+`Promise.all()`은 하나의 요청이라도 실패하면 전체가 reject됩니다.
 각 요청의 성공/실패를 독립적으로 처리하려면 `Promise.allSettled()`를 사용합니다.
 
 ```ts
