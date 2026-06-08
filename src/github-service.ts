@@ -70,8 +70,6 @@ interface PullRequestSearchResponse {
   };
 }
 
-const PAGE_SIZE = 100;
-
 export const normalizeLabel = (label: string): ContributionLabel => {
   const key = label.toLowerCase().replace(/[-_\s]/g, '');
   if (key === 'feat' || key === 'feature' || key === 'enhancement')
@@ -170,7 +168,7 @@ export const countByCategory = (
   return counts;
 };
 
-export const createGitHubService = (token: string) => {
+export const createGitHubService = (token: string, pageSize = 100) => {
   const githubGraphQL = graphql.defaults({
     headers: {
       authorization: `token ${token}`,
@@ -220,7 +218,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: IssuePageResponse['repository']['issues'] =
@@ -284,7 +282,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: PullRequestPageResponse['repository']['pullRequests'] =
@@ -345,7 +343,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:issue updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );
@@ -410,7 +408,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:pr is:merged updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );

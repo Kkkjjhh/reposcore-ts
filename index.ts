@@ -58,6 +58,9 @@ cli
   .option('--keywords [items]', '이슈 선점 키워드 목록(쉼표 구분)', {
     default: "제가 하겠습니다,진행하겠습니다,할게요,I'll take this",
   })
+  .option('--page-size <number>', '한 번에 가져올 항목 수 (1~100)', {
+    default: '$PAGE_SIZE',
+  })
   .action(
     async (
       repos: string[],
@@ -70,6 +73,7 @@ cli
         sortOrder: string;
         claims?: boolean;
         keywords?: string;
+        pageSize?: number | string;
       },
     ) => {
       const token =
@@ -85,6 +89,13 @@ cli
       const outputDir = options.outputDir || 'output';
       const sortBy = String(options.sortBy || 'score').toLowerCase();
       const sortOrder = String(options.sortOrder || 'desc').toLowerCase();
+
+      const rawPageSize =
+        options.pageSize === '$PAGE_SIZE'
+          ? Bun.env.PAGE_SIZE ?? 100
+          : options.pageSize;
+      const pageSize = Number(rawPageSize);
+
       const errors: string[] = [];
 
       const isClaimsMode = !!options.claims;
@@ -137,6 +148,12 @@ cli
         );
       }
 
+      if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+        errors.push(
+          `오류: --page-size 값은 1 이상 100 이하의 정수여야 합니다. (입력값: ${options.pageSize})`,
+        );
+      }
+
       if (repos.length === 0) {
         errors.push(
           '오류: 최소 하나 이상의 저장소(owner/repo)를 입력해야 합니다.',
@@ -167,7 +184,7 @@ cli
         process.exit(1);
       }
 
-      const githubService = createGitHubService(token) as FullGitHubService;
+      const githubService = createGitHubService(token, pageSize) as FullGitHubService;
 
       if (isClaimsMode) {
         for (const {repoPath, owner, repoName} of parsedRepos) {
