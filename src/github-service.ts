@@ -4,6 +4,8 @@ import type {
   ContributionLabel,
   DetailedRepoData,
   ClaimInfo,
+  ClaimsIssueNode,
+  ClaimsData,
   RepoClaims,
   IssueRecord,
   PRRecord,
@@ -28,6 +30,25 @@ interface ClaimsPageResponse {
       }[];
       pageInfo: PageInfo;
     };
+  };
+}
+
+interface ClaimsSearchResponse {
+  search: {
+    nodes: Array<{
+      number: number;
+      title: string;
+      url: string;
+      state: string;
+      comments: {
+        nodes: {
+          body: string;
+          author: {login: string} | null;
+          createdAt: string;
+        }[];
+      };
+    }>;
+    pageInfo: PageInfo;
   };
 }
 
@@ -546,39 +567,93 @@ export const createGitHubService = (token: string) => {
   };
 
   /**
-   * 열린 이슈와 최근 댓글을 조회하여 선점 키워드가 포함된 이슈를 분류합니다.
+   * 저장소의 열린 이슈와 최근 댓글을 모두 조회합니다 (전체 조회).
    * @param owner 저장소 소유자
    * @param repo 저장소 이름
-   * @param keywords 선점 여부를 판단할 키워드 목록
-   * @param repoPath 출력에 사용할 저장소 경로
-   * @returns 선점된 이슈와 선점되지 않은 이슈 목록
+   * @returns 열린 이슈 목록 (댓글 포함)
    */
-  const getRecentClaimsData = async (
+  const getAllOpenIssuesWithComments = async (
     owner: string,
     repo: string,
-    keywords: string[],
-    repoPath: string,
-  ): Promise<RepoClaims> => {
-    const claimed: ClaimInfo[] = [];
-    const unclaimed: ClaimInfo[] = [];
+  ): Promise<ClaimsIssueNode[]> => {
+    const issues: ClaimsIssueNode[] = [];
     let cursor: string | null = null;
     let hasNextPage = true;
 
     while (hasNextPage) {
-      const response: ClaimsPageResponse = await githubGraphQL<ClaimsPageResponse>(
-        `
-        query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
-          repository(owner: $owner, name: $repo) {
-            issues(first: $pageSize, after: $cursor, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+      const response: ClaimsPageResponse =
+        await githubGraphQL<ClaimsPageResponse>(
+          `
+          query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
+            repository(owner: $owner, name: $repo) {
+              issues(first: $pageSize, after: $cursor, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
+                nodes {
+                  number
+                  title
+                  url
+                  comments(last: 10) {
+                    nodes {
+                      body
+                      author { login }
+                      createdAt
+                    }
+                  }
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
+              }
+            }
+          }
+          `,
+          {owner, repo, pageSize: PAGE_SIZE, cursor},
+        );
+
+      const connection = response.repository.issues;
+      issues.push(...connection.nodes);
+
+      cursor = connection.pageInfo.endCursor;
+      hasNextPage = connection.pageInfo.hasNextPage && cursor !== null;
+    }
+
+    return issues;
+  };
+
+  /**
+   * 지정한 시점 이후 변경된 이슈(열림/닫힘 모두)와 최근 댓글을 조회합니다 (증분 조회).
+   * @param owner 저장소 소유자
+   * @param repo 저장소 이름
+   * @param since 변경 내역을 조회할 기준 시각
+   * @returns 기준 시각 이후 변경된 이슈 목록 (state 포함, 댓글 포함)
+   */
+  const getUpdatedIssuesWithComments = async (
+    owner: string,
+    repo: string,
+    since: string,
+  ): Promise<Array<ClaimsIssueNode & {state: string}>> => {
+    const issues: Array<ClaimsIssueNode & {state: string}> = [];
+    let cursor: string | null = null;
+    let hasNextPage = true;
+
+    while (hasNextPage) {
+      const response: ClaimsSearchResponse =
+        await githubGraphQL<ClaimsSearchResponse>(
+          `
+          query($searchQuery: String!, $pageSize: Int!, $cursor: String) {
+            search(query: $searchQuery, type: ISSUE, first: $pageSize, after: $cursor) {
               nodes {
-                number
-                title
-                url
-                comments(last: 10) {
-                  nodes {
-                    body
-                    author { login }
-                    createdAt
+                ... on Issue {
+                  number
+                  title
+                  url
+                  state
+                  comments(last: 10) {
+                    nodes {
+                      body
+                      author { login }
+                      createdAt
+                    }
                   }
                 }
               }
@@ -588,53 +663,129 @@ export const createGitHubService = (token: string) => {
               }
             }
           }
-        }
-        `,
-        {owner, repo, pageSize: PAGE_SIZE, cursor},
+          `,
+          {
+            searchQuery: `repo:${owner}/${repo} is:issue updated:>=${since}`,
+            pageSize: PAGE_SIZE,
+            cursor,
+          },
+        );
+
+      issues.push(...response.search.nodes);
+
+      cursor = response.search.pageInfo.endCursor;
+      hasNextPage = response.search.pageInfo.hasNextPage && cursor !== null;
+    }
+
+    return issues;
+  };
+
+  /**
+   * 열린 이슈와 최근 댓글을 조회하여 선점 키워드가 포함된 이슈를 분류합니다.
+   * 캐시가 있으면 마지막 분석 시점 이후의 변경분만 조회해 병합하고,
+   * 캐시가 없으면 전체 데이터를 새로 수집합니다.
+   * @param owner 저장소 소유자
+   * @param repo 저장소 이름
+   * @param keywords 선점 여부를 판단할 키워드 목록
+   * @param repoPath 출력에 사용할 저장소 경로
+   * @param useCache 캐시 사용 여부
+   * @returns 선점된 이슈와 선점되지 않은 이슈 목록
+   */
+  const getRecentClaimsData = async (
+    owner: string,
+    repo: string,
+    keywords: string[],
+    repoPath: string,
+    useCache = true,
+  ): Promise<RepoClaims> => {
+    const analysisStartedAt = new Date().toISOString();
+    const cached = await loadCache<ClaimsData>(
+      owner,
+      repo,
+      !useCache,
+      'claims-cache',
+    );
+
+    let openIssues: ClaimsIssueNode[];
+
+    if (!cached) {
+      openIssues = await getAllOpenIssuesWithComments(owner, repo);
+    } else {
+      const updatedIssues = await getUpdatedIssuesWithComments(
+        owner,
+        repo,
+        cached.lastAnalyzedAt,
       );
 
-      const connection = response.repository.issues;
-      const nodes = connection.nodes;
+      // 닫힌 이슈 번호 집합 — 캐시에서 제거 대상
+      const closedNumbers = new Set(
+        updatedIssues.filter(i => i.state === 'CLOSED').map(i => i.number),
+      );
 
-      for (const node of nodes) {
-        let matchedClaim: {
-          claimer: string;
-          keyword: string;
-          createdAt: string;
-        } | null = null;
-        
-        const comments = [...node.comments.nodes].reverse();
+      // 캐시에서 닫힌 이슈 제거
+      const filteredCached = cached.data.issues.filter(
+        i => !closedNumbers.has(i.number),
+      );
 
-        for (const comment of comments) {
-          const foundKeyword = keywords.find(k => comment.body.includes(k));
-          if (foundKeyword) {
-            matchedClaim = {
-              claimer: comment.author?.login ?? 'unknown',
-              keyword: foundKeyword,
-              createdAt: comment.createdAt,
-            };
-            break;
-          }
-        }
+      // 업데이트된 열린 이슈만 추출 (state 필드 제거)
+      const openUpdated: ClaimsIssueNode[] = updatedIssues
+        .filter(i => i.state === 'OPEN')
+        .map(({number, title, url, comments}) => ({
+          number,
+          title,
+          url,
+          comments,
+        }));
 
-        const info: ClaimInfo = {
-          issueNumber: node.number,
-          title: node.title,
-          url: node.url,
-          claimedBy: matchedClaim?.claimer ?? null,
-          matchedKeyword: matchedClaim?.keyword ?? null,
-          claimedAt: matchedClaim?.createdAt ?? null,
-      };
+      openIssues = mergeByNumber(filteredCached, openUpdated);
+    }
 
-        if (matchedClaim) {
-          claimed.push(info);
-        } else {
-          unclaimed.push(info);
+    await saveCache<ClaimsData>(
+      owner,
+      repo,
+      {issues: openIssues},
+      analysisStartedAt,
+      'claims-cache',
+    );
+
+    const claimed: ClaimInfo[] = [];
+    const unclaimed: ClaimInfo[] = [];
+
+    for (const node of openIssues) {
+      let matchedClaim: {
+        claimer: string;
+        keyword: string;
+        createdAt: string;
+      } | null = null;
+
+      const comments = [...node.comments.nodes].reverse();
+
+      for (const comment of comments) {
+        const foundKeyword = keywords.find(k => comment.body.includes(k));
+        if (foundKeyword) {
+          matchedClaim = {
+            claimer: comment.author?.login ?? 'unknown',
+            keyword: foundKeyword,
+            createdAt: comment.createdAt,
+          };
+          break;
         }
       }
 
-      cursor = connection.pageInfo.endCursor;
-      hasNextPage = connection.pageInfo.hasNextPage && cursor !== null;
+      const info: ClaimInfo = {
+        issueNumber: node.number,
+        title: node.title,
+        url: node.url,
+        claimedBy: matchedClaim?.claimer ?? null,
+        matchedKeyword: matchedClaim?.keyword ?? null,
+        claimedAt: matchedClaim?.createdAt ?? null,
+      };
+
+      if (matchedClaim) {
+        claimed.push(info);
+      } else {
+        unclaimed.push(info);
+      }
     }
 
     return {repoPath, claimed, unclaimed};

@@ -14,10 +14,14 @@ export interface RepoCache<T> {
  * 저장소별 캐시 파일 경로를 생성합니다.
  * @param owner 저장소 소유자
  * @param repo 저장소 이름
+ * @param cacheKey 캐시 파일 구분 키 (기본값: 'cache')
  * @returns 저장소 캐시 파일 경로
  */
-const getCacheFilePath = (owner: string, repo: string): string =>
-  `${CACHE_DIR}/${owner}_${repo}/cache.json`;
+const getCacheFilePath = (
+  owner: string,
+  repo: string,
+  cacheKey = 'cache',
+): string => `${CACHE_DIR}/${owner}_${repo}/${cacheKey}.json`;
 
 /**
  * 저장소의 캐시 파일을 읽어 기존 분석 결과를 불러옵니다.
@@ -25,19 +29,21 @@ const getCacheFilePath = (owner: string, repo: string): string =>
  * @param owner 저장소 소유자
  * @param repo 저장소 이름
  * @param noCache 캐시 사용을 건너뛸지 여부
+ * @param cacheKey 캐시 파일 구분 키 (기본값: 'cache')
  * @returns 저장소 캐시 데이터 또는 null
  */
 export const loadCache = async <T>(
   owner: string,
   repo: string,
   noCache = false,
+  cacheKey = 'cache',
 ): Promise<RepoCache<T> | null> => {
   if (noCache) {
     console.error('캐시를 무시하고 전체 데이터를 다시 수집합니다.');
     return null;
   }
 
-  const cacheFile = getCacheFilePath(owner, repo);
+  const cacheFile = getCacheFilePath(owner, repo, cacheKey);
   const file = Bun.file(cacheFile);
 
   if (!(await file.exists())) return null;
@@ -61,6 +67,7 @@ export const loadCache = async <T>(
  * @param repo 저장소 이름
  * @param data 캐시에 저장할 분석 결과 데이터
  * @param analyzedAt 분석 기준 시각
+ * @param cacheKey 캐시 파일 구분 키 (기본값: 'cache')
  * @returns 반환값이 없습니다.
  */
 export const saveCache = async <T>(
@@ -68,6 +75,7 @@ export const saveCache = async <T>(
   repo: string,
   data: T,
   analyzedAt = new Date().toISOString(),
+  cacheKey = 'cache',
 ): Promise<void> => {
   const cache: RepoCache<T> = {
     repository: `${owner}/${repo}`,
@@ -76,7 +84,7 @@ export const saveCache = async <T>(
   };
 
   await Bun.write(
-    getCacheFilePath(owner, repo),
+    getCacheFilePath(owner, repo, cacheKey),
     JSON.stringify(cache, null, 2),
   );
 

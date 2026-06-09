@@ -95,6 +95,34 @@ export interface DetailedRepoData {
   issues: IssueRecord[];
 }
 
+/**
+ * 선점 캐시에 저장되는 열린 이슈 노드입니다.
+ */
+export interface ClaimsIssueNode {
+  /** GitHub 이슈 번호. */
+  number: number;
+  /** 제목. */
+  title: string;
+  /** GitHub 웹 URL. */
+  url: string;
+  /** 선점 키워드 판별에 사용할 댓글 목록. */
+  comments: {
+    nodes: {
+      body: string;
+      author: {login: string} | null;
+      createdAt: string;
+    }[];
+  };
+}
+
+/**
+ * 선점 조회 경로의 캐시 저장 데이터입니다.
+ */
+export interface ClaimsData {
+  /** 열린 이슈 목록(댓글 포함). */
+  issues: ClaimsIssueNode[];
+}
+
 /** 선점된 이슈 정보 */
 export interface ClaimInfo {
   issueNumber: number;
@@ -121,6 +149,7 @@ export interface ClaimService {
     repoName: string,
     keywords: string[],
     repoPath: string,
+    useCache?: boolean,
   ): Promise<RepoClaims>;
 }
 

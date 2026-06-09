@@ -98,7 +98,7 @@ cli
 
       const rawPageSize =
         options.pageSize === '$PAGE_SIZE'
-          ? Bun.env.PAGE_SIZE ?? 100
+          ? (Bun.env.PAGE_SIZE ?? 100)
           : options.pageSize;
       const pageSize = Number(rawPageSize);
 
@@ -205,6 +205,7 @@ cli
               repoName,
               claimKeywords,
               repoPath,
+              useCache,
             );
             printClaims(claims);
           } catch (error: unknown) {
