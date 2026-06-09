@@ -19,8 +19,8 @@ bun install
 # 기본 실행 예시
 bun run index.ts <owner/repo...> [options]
 
-# 저장소 2개 실행 예시
-bun run index.ts oss2026hnu/reposcore-cs oss2026hnu/reposcore-ts
+# 저장소 3개 실행 예시
+bun run index.ts oss2026hnu/reposcore-cs oss2026hnu/reposcore-ts oss2026hnu/reposcore-py
 
 # GitHub 개인 액세스 토큰(PAT) 사용 예시
 bun run index.ts oss2026hnu/reposcore-ts --token YOUR_GITHUB_TOKEN
