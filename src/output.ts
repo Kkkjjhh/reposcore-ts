@@ -252,44 +252,32 @@ export interface ScoreOutputData {
 }
 
 /**
- * 저장소 요약 데이터 정보와 전체 사용자 점수 데이터를 가독성 있는 HTML 포맷 문자열로 빌드합니다.
+ * 사용자별 기여 항목을 보여주는 누적 막대 차트를 포함한 HTML 보고서를 빌드합니다.
+ * Chart.js(가로 누적 막대)와 datalabels 플러그인을 CDN으로 로드합니다.
  *
  * @param data 저장소 요약 및 사용자 점수 데이터 정보 객체
  * @returns HTML 파일용 보고서 문자열
  */
 export const buildHtmlReport = (data: ScoreOutputData): string => {
-  const repoRows = data.repoSummaries
-    .map(
-      s => `
-    <tr>
-      <td>${s.repoPath}</td>
-      <td>${s.mergedPrFeatureBug}</td>
-      <td>${s.mergedPrDocs}</td>
-      <td>${s.mergedPrTypo}</td>
-      <td>${s.closedIssueFeatureBug}</td>
-      <td>${s.closedIssueDocs}</td>
-    </tr>
-  `,
-    )
-    .join('');
+  const users = data.userScores.map(user => {
+    const agg = ScoreCalculator.getAccumulatedContributions(user);
+    return {
+      label: `${user.userId} (점수: ${user.totalScore})`,
+      issueDocs: agg.issueDocs,
+      issueFeatureBug: agg.issueFeatureBug,
+      prTypo: agg.prTypo,
+      prDocs: agg.prDocs,
+      prFeatureBug: agg.prFeatureBug,
+    };
+  });
 
-  const userRows = data.userScores
-    .map(user => {
-      const aggregated = ScoreCalculator.getAccumulatedContributions(user);
-      
-      return `
-    <tr>
-      <td>${user.userId}</td>
-      <td>${aggregated.prFeatureBug}</td>
-      <td>${aggregated.prDocs}</td>
-      <td>${aggregated.prTypo}</td>
-      <td>${aggregated.issueFeatureBug}</td>
-      <td>${aggregated.issueDocs}</td>
-      <td><strong>${user.totalScore}</strong></td>
-    </tr>
-    `;
-    })
-    .join('');
+  const labels = JSON.stringify(users.map(u => u.label));
+  const issueDocs = JSON.stringify(users.map(u => u.issueDocs));
+  const issueFeatureBug = JSON.stringify(users.map(u => u.issueFeatureBug));
+  const prTypo = JSON.stringify(users.map(u => u.prTypo));
+  const prDocs = JSON.stringify(users.map(u => u.prDocs));
+  const prFeatureBug = JSON.stringify(users.map(u => u.prFeatureBug));
+  const chartHeight = Math.max(400, users.length * 30);
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -297,52 +285,73 @@ export const buildHtmlReport = (data: ScoreOutputData): string => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RepoScore Report</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"><\/script>
   <style>
     body { font-family: sans-serif; padding: 20px; }
-    table { border-collapse: collapse; width: 100%; margin-bottom: 30px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
-    th { background-color: #f2f2f2; text-align: center; }
-    td:first-child { text-align: left; font-weight: bold; }
-    h2 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
+    h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
   </style>
 </head>
 <body>
   <h1>RepoScore Report</h1>
-
-  <h2>Repository Summaries</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Repository</th>
-        <th>Merged PRs (Feature/Bug)</th>
-        <th>Merged PRs (Docs)</th>
-        <th>Merged PRs (Typo)</th>
-        <th>Closed Issues (Feature/Bug)</th>
-        <th>Closed Issues (Docs)</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${repoRows}
-    </tbody>
-  </table>
-
-  <h2>User Scores</h2>
-  <table>
-    <thead>
-      <tr>
-        <th>User ID</th>
-        <th>PR (Feature/Bug)</th>
-        <th>PR (Docs)</th>
-        <th>PR (Typo)</th>
-        <th>Issue (Feature/Bug)</th>
-        <th>Issue (Docs)</th>
-        <th>Total Score</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${userRows}
-    </tbody>
-  </table>
+  <canvas id="chart" style="height:${chartHeight}px;"></canvas>
+  <script>
+    Chart.register(ChartDataLabels);
+    new Chart(document.getElementById('chart'), {
+      type: 'bar',
+      data: {
+        labels: ${labels},
+        datasets: [
+          {
+            label: '문서 이슈',
+            data: ${issueDocs},
+            backgroundColor: 'rgba(54,162,235,0.8)'
+          },
+          {
+            label: '기능·버그 이슈',
+            data: ${issueFeatureBug},
+            backgroundColor: 'rgba(255,99,132,0.8)'
+          },
+          {
+            label: '오타 PR',
+            data: ${prTypo},
+            backgroundColor: 'rgba(255,206,86,0.8)'
+          },
+          {
+            label: '문서 PR',
+            data: ${prDocs},
+            backgroundColor: 'rgba(75,192,192,0.8)'
+          },
+          {
+            label: '기능·버그 PR',
+            data: ${prFeatureBug},
+            backgroundColor: 'rgba(153,102,255,0.8)'
+          }
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { position: 'top' },
+          title: {
+            display: true,
+            text: 'RepoScore - 사용자별 기여 현황'
+          },
+          datalabels: {
+            display: context => context.dataset.data[context.dataIndex] > 0,
+            color: '#fff',
+            font: { weight: 'bold' },
+            formatter: value => value
+          }
+        },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true }
+        }
+      }
+    });
+  <\/script>
 </body>
 </html>`;
 };
