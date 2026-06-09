@@ -92,6 +92,10 @@ interface PullRequestSearchResponse {
   };
 }
 
+interface GetDetailedRepoDataOptions {
+  since?: string;
+}
+
 const PAGE_SIZE = 100;
 
 /**
@@ -236,7 +240,7 @@ export const countByCategory = (
  * @param token GitHub Personal Access Token
  * @returns 저장소 상세 데이터와 이슈 선점 현황을 조회하는 서비스 객체
  */
-export const createGitHubService = (token: string) => {
+export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
   const githubGraphQL = graphql.defaults({
     headers: {
       authorization: `token ${token}`,
@@ -293,7 +297,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: IssuePageResponse['repository']['issues'] =
@@ -363,7 +367,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: PullRequestPageResponse['repository']['pullRequests'] =
@@ -432,7 +436,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:issue updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );
@@ -504,7 +508,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:pr is:merged updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );
@@ -531,6 +535,7 @@ export const createGitHubService = (token: string) => {
     owner: string,
     repo: string,
     useCache = true,
+    options?: GetDetailedRepoDataOptions,
   ): Promise<DetailedRepoData> => {
     const analysisStartedAt = new Date().toISOString();
     const cached = await loadCache<DetailedRepoData>(owner, repo, !useCache);
@@ -551,9 +556,11 @@ export const createGitHubService = (token: string) => {
       return data;
     }
 
+    const since = options?.since ?? cached.lastAnalyzedAt;
+
     const [updatedIssues, updatedPrs] = await Promise.all([
-      getUpdatedValidIssues(owner, repo, cached.lastAnalyzedAt),
-      getUpdatedMergedPullRequests(owner, repo, cached.lastAnalyzedAt),
+      getUpdatedValidIssues(owner, repo, since),
+      getUpdatedMergedPullRequests(owner, repo, since),
     ]);
 
     const data: DetailedRepoData = {

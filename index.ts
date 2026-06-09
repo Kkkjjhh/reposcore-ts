@@ -43,16 +43,17 @@ function parseRepoPath(repoPath: string) {
 
 cli
   .command('[...repos]', '대상 저장소 목록 (예: owner/repo1 owner/repo2)')
-  .option('--token <token>', 'GitHub Personal Access Token', {
+  .option('-t, --token <token>', 'GitHub Personal Access Token', {
     default: '$GITHUB_TOKEN',
   })
-  .option('--format <format>', '출력 형식 (csv, txt, html)', {
+  .option('-f, --format <format>', '출력 형식 (csv, txt, html)', {
     default: 'csv',
   })
   .option('--output-dir <path>', '결과 파일을 저장할 디렉터리', {
     default: 'output',
   })
   .option('--no-cache', '캐시를 무시하고 GitHub API를 새로 호출합니다')
+  .option('--since <since>', '캐시 이후 증분 수집 기준 시점 ISO8601')
   .option('--sort-by <field>', '정렬 기준 (score, id)', {
     default: 'score',
   })
@@ -74,6 +75,7 @@ cli
         format: string;
         cache: boolean;
         outputDir?: string;
+        since?: string;
         sortBy: string;
         sortOrder: string;
         claims?: boolean;
@@ -91,8 +93,9 @@ cli
         .split(',')
         .map(format => format.trim())
         .filter(Boolean);
-      const useCache = options.cache; // --no-cache 전달 시 false
+      const useCache = options.cache;
       const outputDir = options.outputDir || 'output';
+      const since = options.since;
       const sortBy = String(options.sortBy || 'score').toLowerCase();
       const sortOrder = String(options.sortOrder || 'desc').toLowerCase();
 
@@ -194,7 +197,10 @@ cli
         process.exit(1);
       }
 
-      const githubService = createGitHubService(token) as FullGitHubService;
+      const githubService = createGitHubService(
+        token,
+        pageSize,
+      ) as FullGitHubService;
 
       // --claims 옵션이 있으면 점수 계산 대신 이슈 선점 현황만 조회합니다.
       if (isClaimsMode) {
@@ -231,6 +237,7 @@ cli
             owner,
             repoName,
             useCache,
+            {since},
           );
 
           // 수집한 데이터를 바탕으로 저장소별 점수와 요약 정보를 계산합니다.
