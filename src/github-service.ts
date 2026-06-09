@@ -565,8 +565,9 @@ export const createGitHubService = (token: string) => {
     let hasNextPage = true;
 
     while (hasNextPage) {
-      const response: ClaimsPageResponse = await githubGraphQL<ClaimsPageResponse>(
-        `
+      const response: ClaimsPageResponse =
+        await githubGraphQL<ClaimsPageResponse>(
+          `
         query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
           repository(owner: $owner, name: $repo) {
             issues(first: $pageSize, after: $cursor, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -590,8 +591,8 @@ export const createGitHubService = (token: string) => {
           }
         }
         `,
-        {owner, repo, pageSize: PAGE_SIZE, cursor},
-      );
+          {owner, repo, pageSize: PAGE_SIZE, cursor},
+        );
 
       const connection = response.repository.issues;
       const nodes = connection.nodes;
@@ -602,11 +603,19 @@ export const createGitHubService = (token: string) => {
           keyword: string;
           createdAt: string;
         } | null = null;
-        
+
         const comments = [...node.comments.nodes].reverse();
 
+        const normalize = (text: string): string =>
+          text.replace(/\s+/g, '').toLowerCase();
+
         for (const comment of comments) {
-          const foundKeyword = keywords.find(k => comment.body.includes(k));
+          const normalizedBody = normalize(comment.body);
+
+          const foundKeyword = keywords.find(keyword =>
+            normalizedBody.includes(normalize(keyword)),
+          );
+
           if (foundKeyword) {
             matchedClaim = {
               claimer: comment.author?.login ?? 'unknown',
@@ -624,7 +633,7 @@ export const createGitHubService = (token: string) => {
           claimedBy: matchedClaim?.claimer ?? null,
           matchedKeyword: matchedClaim?.keyword ?? null,
           claimedAt: matchedClaim?.createdAt ?? null,
-      };
+        };
 
         if (matchedClaim) {
           claimed.push(info);
