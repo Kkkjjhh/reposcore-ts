@@ -219,7 +219,7 @@ export const countByCategory = (
  * @param token GitHub Personal Access Token
  * @returns 저장소 상세 데이터와 이슈 선점 현황을 조회하는 서비스 객체
  */
-export const createGitHubService = (token: string) => {
+export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
   const githubGraphQL = graphql.defaults({
     headers: {
       authorization: `token ${token}`,
@@ -276,7 +276,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: IssuePageResponse['repository']['issues'] =
@@ -346,7 +346,7 @@ export const createGitHubService = (token: string) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection: PullRequestPageResponse['repository']['pullRequests'] =
@@ -415,7 +415,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:issue updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );
@@ -487,7 +487,7 @@ export const createGitHubService = (token: string) => {
           `,
           {
             searchQuery: `repo:${owner}/${repo} is:pr is:merged updated:>=${since}`,
-            pageSize: PAGE_SIZE,
+            pageSize,
             cursor,
           },
         );
@@ -572,8 +572,9 @@ export const createGitHubService = (token: string) => {
     let hasNextPage = true;
 
     while (hasNextPage) {
-      const response: ClaimsPageResponse = await githubGraphQL<ClaimsPageResponse>(
-        `
+      const response: ClaimsPageResponse =
+        await githubGraphQL<ClaimsPageResponse>(
+          `
         query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
           repository(owner: $owner, name: $repo) {
             issues(first: $pageSize, after: $cursor, states: OPEN, orderBy: {field: CREATED_AT, direction: DESC}) {
@@ -597,8 +598,8 @@ export const createGitHubService = (token: string) => {
           }
         }
         `,
-        {owner, repo, pageSize: PAGE_SIZE, cursor},
-      );
+          {owner, repo, pageSize, cursor},
+        );
 
       const connection = response.repository.issues;
       const nodes = connection.nodes;
@@ -609,7 +610,7 @@ export const createGitHubService = (token: string) => {
           keyword: string;
           createdAt: string;
         } | null = null;
-        
+
         const comments = [...node.comments.nodes].reverse();
 
         for (const comment of comments) {
@@ -631,7 +632,7 @@ export const createGitHubService = (token: string) => {
           claimedBy: matchedClaim?.claimer ?? null,
           matchedKeyword: matchedClaim?.keyword ?? null,
           claimedAt: matchedClaim?.createdAt ?? null,
-      };
+        };
 
         if (matchedClaim) {
           claimed.push(info);
