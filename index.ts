@@ -43,10 +43,10 @@ function parseRepoPath(repoPath: string) {
 
 cli
   .command('[...repos]', '대상 저장소 목록 (예: owner/repo1 owner/repo2)')
-  .option('--token <token>', 'GitHub Personal Access Token', {
+  .option('-t, --token <token>', 'GitHub Personal Access Token', {
     default: '$GITHUB_TOKEN',
   })
-  .option('--format <format>', '출력 형식 (csv, txt, html)', {
+  .option('-f, --format <format>', '출력 형식 (csv, txt, html)', {
     default: 'csv',
   })
   .option('--output-dir <path>', '결과 파일을 저장할 디렉터리', {
