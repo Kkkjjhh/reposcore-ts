@@ -31,6 +31,21 @@ interface ClaimsPageResponse {
   };
 }
 
+interface OpenPrNode {
+  number: number;
+  url: string;
+  body: string | null;
+}
+
+interface OpenPrPageResponse {
+  repository: {
+    pullRequests: {
+      nodes: OpenPrNode[];
+      pageInfo: PageInfo;
+    };
+  };
+}
+
 type RawIssue = Omit<IssueRecord, 'category'>;
 type RawPullRequest = Omit<PRRecord, 'category'>;
 
@@ -566,6 +581,51 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
     keywords: string[],
     repoPath: string,
   ): Promise<RepoClaims> => {
+    const issueToOpenPr = new Map<number, {number: number; url: string}>();
+    let prCursor: string | null = null;
+    let prHasNextPage = true;
+
+    while (prHasNextPage) {
+      const prResponse: OpenPrPageResponse =
+        await githubGraphQL<OpenPrPageResponse>(
+          `
+        query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
+          repository(owner: $owner, name: $repo) {
+            pullRequests(first: $pageSize, after: $cursor, states: OPEN) {
+              nodes {
+                number
+                url
+                body
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        }
+        `,
+          {owner, repo, pageSize: PAGE_SIZE, cursor: prCursor},
+        );
+
+      const prConnection: OpenPrPageResponse['repository']['pullRequests'] =
+        prResponse.repository.pullRequests;
+
+      for (const pr of prConnection.nodes) {
+        const body = pr.body ?? '';
+        const matches = body.matchAll(/#(\d+)/g);
+        for (const match of matches) {
+          const issueNum = parseInt(match[1]!, 10);
+          if (!issueToOpenPr.has(issueNum)) {
+            issueToOpenPr.set(issueNum, {number: pr.number, url: pr.url});
+          }
+        }
+      }
+
+      prCursor = prConnection.pageInfo.endCursor;
+      prHasNextPage = prConnection.pageInfo.hasNextPage && prCursor !== null;
+    }
+
     const claimed: ClaimInfo[] = [];
     const unclaimed: ClaimInfo[] = [];
     let cursor: string | null = null;
@@ -602,9 +662,8 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
         );
 
       const connection = response.repository.issues;
-      const nodes = connection.nodes;
 
-      for (const node of nodes) {
+      for (const node of connection.nodes) {
         let matchedClaim: {
           claimer: string;
           keyword: string;
@@ -625,6 +684,8 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
           }
         }
 
+        const linkedPr = issueToOpenPr.get(node.number) ?? null;
+
         const info: ClaimInfo = {
           issueNumber: node.number,
           title: node.title,
@@ -632,6 +693,8 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
           claimedBy: matchedClaim?.claimer ?? null,
           matchedKeyword: matchedClaim?.keyword ?? null,
           claimedAt: matchedClaim?.createdAt ?? null,
+          linkedPrNumber: linkedPr?.number ?? null,
+          linkedPrUrl: linkedPr?.url ?? null,
         };
 
         if (matchedClaim) {

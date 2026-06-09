@@ -106,6 +106,8 @@ export interface ClaimInfo {
   claimedBy: string | null;
   matchedKeyword: string | null;
   claimedAt: string | null;
+  linkedPrNumber: number | null;
+  linkedPrUrl: string | null;
 }
 
 /** 저장소별 선점 현황 */

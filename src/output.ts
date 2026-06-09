@@ -416,7 +416,13 @@ const getTaskDeadline = (title: string): {type: string; hours: number} => {
 const getDeadlineStatus = (
   claimedAt: string,
   deadlineHours: number,
+  linkedPrNumber: number | null,
+  linkedPrUrl: string | null,
 ): string => {
+  if (linkedPrNumber !== null) {
+    return `PR 생성됨 - #${linkedPrNumber} (${linkedPrUrl})`;
+  }
+
   const start = new Date(claimedAt).getTime();
   const now = new Date().getTime();
   const deadline = start + deadlineHours * 60 * 60 * 1000;
@@ -449,7 +455,7 @@ export const printClaims = (claims: RepoClaims): void => {
       console.log(`  URL: ${c.url}`);
       if (c.claimedAt) {
         const {type, hours} = getTaskDeadline(c.title);
-        const status = getDeadlineStatus(c.claimedAt, hours);
+        const status = getDeadlineStatus(c.claimedAt, hours, c.linkedPrNumber, c.linkedPrUrl);
         console.log(`  선점자: ${c.claimedBy}`);
         console.log(`  상태: ${type} [${hours}시간 기한] | ${status}`);
       } else {
