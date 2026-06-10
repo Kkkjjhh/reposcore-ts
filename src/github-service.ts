@@ -33,6 +33,19 @@ interface ClaimsPageResponse {
   };
 }
 
+interface OpenPrPageResponse {
+  repository: {
+    pullRequests: {
+      nodes: {
+        number: number;
+        url: string;
+        body: string | null;
+      }[];
+      pageInfo: PageInfo;
+    };
+  };
+}
+
 interface ClaimsSearchResponse {
   search: {
     nodes: Array<{
@@ -574,48 +587,45 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
   };
 
   /**
-   * 저장소의 열린 이슈와 최근 댓글을 모두 조회합니다 (전체 조회).
+   * 저장소의 열린 PR 본문에서 이슈 번호를 파싱해 이슈 번호 → 열린 PR 매핑을 반환합니다.
    * @param owner 저장소 소유자
    * @param repo 저장소 이름
-   * @returns 열린 이슈 목록 (댓글 포함)
+   * @returns 이슈 번호 → {number, url} 열린 PR 매핑
    */
-  const getAllOpenIssuesWithComments = async (
+  const getOpenPrIssueMap = async (
     owner: string,
     repo: string,
-    keywords: string[],
-    repoPath: string,
-  ): Promise<RepoClaims> => {
+  ): Promise<Map<number, {number: number; url: string}>> => {
     const issueToOpenPr = new Map<number, {number: number; url: string}>();
-    let prCursor: string | null = null;
-    let prHasNextPage = true;
+    let cursor: string | null = null;
+    let hasNextPage = true;
 
-    while (prHasNextPage) {
-      const prResponse: OpenPrPageResponse =
+    while (hasNextPage) {
+      const response: OpenPrPageResponse =
         await githubGraphQL<OpenPrPageResponse>(
           `
-        query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
-          repository(owner: $owner, name: $repo) {
-            pullRequests(first: $pageSize, after: $cursor, states: OPEN) {
-              nodes {
-                number
-                url
-                body
-              }
-              pageInfo {
-                hasNextPage
-                endCursor
+          query($owner: String!, $repo: String!, $pageSize: Int!, $cursor: String) {
+            repository(owner: $owner, name: $repo) {
+              pullRequests(first: $pageSize, after: $cursor, states: OPEN) {
+                nodes {
+                  number
+                  url
+                  body
+                }
+                pageInfo {
+                  hasNextPage
+                  endCursor
+                }
               }
             }
           }
-        }
-        `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor: prCursor},
+          `,
+          {owner, repo, pageSize, cursor},
         );
 
-      const prConnection: OpenPrPageResponse['repository']['pullRequests'] =
-        prResponse.repository.pullRequests;
+      const connection = response.repository.pullRequests;
 
-      for (const pr of prConnection.nodes) {
+      for (const pr of connection.nodes) {
         const body = pr.body ?? '';
         const matches = body.matchAll(/#(\d+)/g);
         for (const match of matches) {
@@ -626,12 +636,24 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
         }
       }
 
-      prCursor = prConnection.pageInfo.endCursor;
-      prHasNextPage = prConnection.pageInfo.hasNextPage && prCursor !== null;
+      cursor = connection.pageInfo.endCursor;
+      hasNextPage = connection.pageInfo.hasNextPage && cursor !== null;
     }
 
-    const claimed: ClaimInfo[] = [];
-    const unclaimed: ClaimInfo[] = [];
+    return issueToOpenPr;
+  };
+
+  /**
+   * 저장소의 열린 이슈와 최근 댓글을 모두 조회합니다 (전체 조회).
+   * @param owner 저장소 소유자
+   * @param repo 저장소 이름
+   * @returns 열린 이슈 목록 (댓글 포함)
+   */
+  const getAllOpenIssuesWithComments = async (
+    owner: string,
+    repo: string,
+  ): Promise<ClaimsIssueNode[]> => {
+    const issues: ClaimsIssueNode[] = [];
     let cursor: string | null = null;
     let hasNextPage = true;
 
@@ -662,7 +684,7 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
             }
           }
           `,
-          {owner, repo, pageSize: PAGE_SIZE, cursor},
+          {owner, repo, pageSize, cursor},
         );
 
       const connection = response.repository.issues;
@@ -761,16 +783,24 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
       'claims-cache',
     );
 
+    const [issueToOpenPr, openIssuesResult] = await (cached
+      ? Promise.all([
+          getOpenPrIssueMap(owner, repo),
+          getUpdatedIssuesWithComments(owner, repo, cached.lastAnalyzedAt),
+        ])
+      : Promise.all([
+          getOpenPrIssueMap(owner, repo),
+          getAllOpenIssuesWithComments(owner, repo),
+        ]));
+
     let openIssues: ClaimsIssueNode[];
 
     if (!cached) {
-      openIssues = await getAllOpenIssuesWithComments(owner, repo);
+      openIssues = openIssuesResult as ClaimsIssueNode[];
     } else {
-      const updatedIssues = await getUpdatedIssuesWithComments(
-        owner,
-        repo,
-        cached.lastAnalyzedAt,
-      );
+      const updatedIssues = openIssuesResult as Array<
+        ClaimsIssueNode & {state: string}
+      >;
 
       // 닫힌 이슈 번호 집합 — 캐시에서 제거 대상
       const closedNumbers = new Set(
@@ -827,6 +857,8 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
         }
       }
 
+      const linkedPr = issueToOpenPr.get(node.number) ?? null;
+
       const info: ClaimInfo = {
         issueNumber: node.number,
         title: node.title,
@@ -834,6 +866,8 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
         claimedBy: matchedClaim?.claimer ?? null,
         matchedKeyword: matchedClaim?.keyword ?? null,
         claimedAt: matchedClaim?.createdAt ?? null,
+        linkedPrNumber: linkedPr?.number ?? null,
+        linkedPrUrl: linkedPr?.url ?? null,
       };
 
       if (matchedClaim) {
