@@ -111,7 +111,7 @@ interface GetDetailedRepoDataOptions {
 
 const PAGE_SIZE = 100;
 
-const normalizeWhitespace = (text: string): string =>
+export const normalizeWhitespace = (text: string): string =>
   text.replace(/\s+/g, '').toLowerCase();
 
 /**
