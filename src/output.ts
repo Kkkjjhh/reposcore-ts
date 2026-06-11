@@ -1,5 +1,5 @@
 import {mkdir} from 'node:fs/promises';
-import {countByCategory} from './github-service';
+import {categorizeLabels, countByCategory} from './github-service';
 import type {DetailedRepoData, RepoClaims} from './types';
 import {ScoreCalculator, type UserScore} from './score-calculator'; // ScoreCalculator 클래스 임포트 추가
 
@@ -285,8 +285,8 @@ export const buildHtmlReport = (data: ScoreOutputData): string => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>RepoScore Report</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"><\/script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"><\/script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 20px; }
     h1 { border-bottom: 2px solid #eee; padding-bottom: 10px; }
@@ -351,7 +351,7 @@ export const buildHtmlReport = (data: ScoreOutputData): string => {
         }
       }
     });
-  <\/script>
+  </script>
 </body>
 </html>`;
 };
@@ -400,12 +400,15 @@ export const writeOutputFiles = async (
 };
 
 /**
- * 이슈 제목을 기반으로 작업 유형 및 기한(시간)을 결정합니다.
- * issue-pr-guide.md의 규칙을 따릅니다.
+ * 이슈 라벨을 기반으로 작업 유형 및 기한(시간)을 결정합니다.
+ * documentation/typo 계열 라벨은 문서 작업(24h), 그 외는 코드 작업(48h)으로 처리합니다.
  */
-const getTaskDeadline = (title: string): {type: string; hours: number} => {
-  const lowerTitle = title.toLowerCase();
-  const isDoc = /docs|readme|문서|오타|typo/i.test(lowerTitle);
+const getTaskDeadline = (labels: {
+  nodes: {name: string}[];
+}): {type: string; hours: number} => {
+  const labelNames = labels.nodes.map(node => node.name);
+  const category = categorizeLabels(labelNames);
+  const isDoc = category === 'doc' || category === 'typo';
 
   return isDoc ? {type: '문서', hours: 24} : {type: '코드', hours: 48};
 };
@@ -454,8 +457,13 @@ export const printClaims = (claims: RepoClaims): void => {
       console.log(`- #${c.issueNumber} ${c.title}`);
       console.log(`  URL: ${c.url}`);
       if (c.claimedAt) {
-        const {type, hours} = getTaskDeadline(c.title);
-        const status = getDeadlineStatus(c.claimedAt, hours, c.linkedPrNumber, c.linkedPrUrl);
+        const {type, hours} = getTaskDeadline(c.labels);
+        const status = getDeadlineStatus(
+          c.claimedAt,
+          hours,
+          c.linkedPrNumber,
+          c.linkedPrUrl,
+        );
         console.log(`  선점자: ${c.claimedBy}`);
         console.log(`  상태: ${type} [${hours}시간 기한] | ${status}`);
       } else {

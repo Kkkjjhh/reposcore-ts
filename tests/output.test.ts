@@ -1,5 +1,10 @@
 import {describe, expect, test} from 'bun:test';
-import {buildUserScoresTxt, type ScoreOutputData} from '../src/output';
+import {
+  buildUserScoresTxt,
+  printClaims,
+  type ScoreOutputData,
+} from '../src/output';
+import type {RepoClaims} from '../src/types';
 
 const analyzedAt = new Date(2026, 5, 4, 9, 30);
 
@@ -104,5 +109,58 @@ describe('TXT 리포트 출력', () => {
     expect(result).toContain(
       '[추가 제안] 기능/버그 PR 1개 추가 시 문서PR 인정 한도 +3',
     );
+  });
+});
+
+describe('선점 기한 판정', () => {
+  test('이슈 제목이 아닌 라벨 기준으로 문서/코드 기한을 출력해야 한다', () => {
+    const claims: RepoClaims = {
+      repoPath: 'oss2026hnu/reposcore-ts',
+      claimed: [
+        {
+          issueNumber: 101,
+          title: 'Refactor parser module',
+          url: 'https://example.com/issues/101',
+          labels: {
+            nodes: [{name: 'documentation'}],
+          },
+          claimedBy: 'alpha',
+          matchedKeyword: '/claim',
+          claimedAt: '2026-06-12T00:00:00.000Z',
+          linkedPrNumber: 55,
+          linkedPrUrl: 'https://example.com/pull/55',
+        },
+        {
+          issueNumber: 102,
+          title: '문서 개선 요청',
+          url: 'https://example.com/issues/102',
+          labels: {
+            nodes: [],
+          },
+          claimedBy: 'beta',
+          matchedKeyword: '/claim',
+          claimedAt: '2026-06-12T00:00:00.000Z',
+          linkedPrNumber: 56,
+          linkedPrUrl: 'https://example.com/pull/56',
+        },
+      ],
+      unclaimed: [],
+    };
+
+    const logs: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => {
+      logs.push(args.map(value => String(value)).join(' '));
+    };
+
+    try {
+      printClaims(claims);
+    } finally {
+      console.log = originalLog;
+    }
+
+    const joined = logs.join('\n');
+    expect(joined).toContain('상태: 문서 [24시간 기한]');
+    expect(joined).toContain('상태: 코드 [48시간 기한]');
   });
 });

@@ -108,6 +108,8 @@ export interface ClaimsIssueNode {
   title: string;
   /** GitHub 웹 URL. */
   url: string;
+  /** 이슈 라벨 목록. */
+  labels: {nodes: {name: string}[]};
   /** 선점 키워드 판별에 사용할 댓글 목록. */
   comments: {
     nodes: {
@@ -131,6 +133,7 @@ export interface ClaimInfo {
   issueNumber: number;
   title: string;
   url: string;
+  labels: {nodes: {name: string}[]};
   claimedBy: string | null;
   matchedKeyword: string | null;
   claimedAt: string | null;

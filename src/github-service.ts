@@ -20,6 +20,7 @@ interface ClaimsPageResponse {
         number: number;
         title: string;
         url: string;
+        labels: {nodes: {name: string}[]};
         comments: {
           nodes: {
             body: string;
@@ -53,6 +54,7 @@ interface ClaimsSearchResponse {
       title: string;
       url: string;
       state: string;
+      labels: {nodes: {name: string}[]};
       comments: {
         nodes: {
           body: string;
@@ -671,6 +673,7 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
                   number
                   title
                   url
+                  labels(first: 20) { nodes { name } }
                   comments(last: 10) {
                     nodes {
                       body
@@ -728,6 +731,7 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
                   title
                   url
                   state
+                  labels(first: 20) { nodes { name } }
                   comments(last: 10) {
                     nodes {
                       body
@@ -818,10 +822,11 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
       // 업데이트된 열린 이슈만 추출 (state 필드 제거)
       const openUpdated: ClaimsIssueNode[] = updatedIssues
         .filter(i => i.state === 'OPEN')
-        .map(({number, title, url, comments}) => ({
+        .map(({number, title, url, labels, comments}) => ({
           number,
           title,
           url,
+          labels,
           comments,
         }));
 
@@ -869,6 +874,7 @@ export const createGitHubService = (token: string, pageSize = PAGE_SIZE) => {
         issueNumber: node.number,
         title: node.title,
         url: node.url,
+        labels: node.labels,
         claimedBy: matchedClaim?.claimer ?? null,
         matchedKeyword: matchedClaim?.keyword ?? null,
         claimedAt: matchedClaim?.createdAt ?? null,
