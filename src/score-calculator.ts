@@ -236,7 +236,7 @@ export class ScoreCalculator {
     }
 
     return Array.from(byUser.entries()).map(([userId, repoScores]) => {
-      const dummyUser: UserScore = { userId, repoScores, totalScore: 0 };
+      const dummyUser: UserScore = {userId, repoScores, totalScore: 0};
       const aggregated = ScoreCalculator.getAccumulatedContributions(dummyUser);
 
       return {
