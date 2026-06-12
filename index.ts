@@ -202,24 +202,34 @@ cli
         pageSize,
       ) as FullGitHubService;
 
-      // --claims 옵션이 있으면 점수 계산 대신 이슈 선점 현황만 조회합니다.
+      // ── [개선] --claims 모드 병렬 처리 ──────────────────────────────────
       if (isClaimsMode) {
-        for (const {repoPath, owner, repoName} of parsedRepos) {
-          try {
-            const claims = await githubService.getRecentClaimsData(
-              owner,
-              repoName,
-              claimKeywords,
-              repoPath,
-              useCache,
-            );
-            printClaims(claims);
-          } catch (error: unknown) {
-            const msg = error instanceof Error ? error.message : String(error);
-            console.error(
-              `오류: '${repoPath}'의 선점 현황을 조회할 수 없습니다. (${msg})`,
-            );
+        const claimTasks = parsedRepos.map(async ({repoPath, owner, repoName}) => {
+          return await githubService.getRecentClaimsData(
+            owner,
+            repoName,
+            claimKeywords,
+            repoPath,
+            useCache,
+          );
+        });
+
+        const claimResults = await Promise.allSettled(claimTasks);
+        let hasClaimFailure = false;
+
+        claimResults.forEach((result, i) => {
+          const {repoPath} = parsedRepos[i]!;
+          if (result.status === 'fulfilled') {
+            printClaims(result.value);
+          } else {
+            hasClaimFailure = true;
+            const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
+            console.error(`오류: '${repoPath}'의 선점 현황을 조회할 수 없습니다. (${msg})`);
           }
+        });
+
+        if (hasClaimFailure) {
+          process.exit(1);
         }
         return;
       }
@@ -227,65 +237,67 @@ cli
       console.log(`형식: ${formats.join(', ')}`);
       console.log(`저장소: ${repos.join(', ')}`);
 
+      // ── [개선] 일반 기여도 점수 산정 모드 병렬 처리 (Promise.allSettled) ──────
+      const tasks = parsedRepos.map(async ({repoPath, owner, repoName}) => {
+        const detailed = await githubService.getDetailedRepoData(
+          owner,
+          repoName,
+          useCache,
+          {since},
+        );
+
+        const repoData = ScoreCalculator.calculateRepoData(detailed, owner, repoName);
+        const repoSummary = summarizeRepo(repoPath, detailed);
+
+        const singleUserScores = sortUserScores(
+          ScoreCalculator.calculateUserScores([repoData]),
+          sortBy as SupportedSortBy,
+          sortOrder as SupportedSortOrder,
+        );
+
+        const subDir = `${owner}-${repoName}`;
+        const written = await writeOutputFiles(
+          formats as SupportedFormat[],
+          {userScores: singleUserScores, repoSummaries: [repoSummary]},
+          outputDir,
+          subDir,
+        );
+
+        return {repoData, repoSummary, written};
+      });
+
+      const results = await Promise.allSettled(tasks);
+
       const repoDataList: RepoData[] = [];
       const repoSummaries: RepoSummary[] = [];
+      let hasFailure = false;
 
-      // 저장소별 GitHub 데이터를 수집하고 개별 결과 파일을 생성합니다.
-      for (const {repoPath, owner, repoName} of parsedRepos) {
-        try {
-          const detailed = await githubService.getDetailedRepoData(
-            owner,
-            repoName,
-            useCache,
-            {since},
-          );
+      // 입력된 순서를 완벽하게 보장하며 순회 및 안전 분기 결합
+      results.forEach((result, i) => {
+        const {repoPath} = parsedRepos[i]!;
 
-          // 수집한 데이터를 바탕으로 저장소별 점수와 요약 정보를 계산합니다.
-          const repoData = ScoreCalculator.calculateRepoData(
-            detailed,
-            owner,
-            repoName,
-          );
-          const repoSummary = summarizeRepo(repoPath, detailed);
-
+        if (result.status === 'fulfilled') {
+          const {repoData, repoSummary, written} = result.value;
           repoDataList.push(repoData);
-          repoSummaries.push(repoSummary);
+          summaries: repoSummaries.push(repoSummary);
 
-          const singleUserScores = sortUserScores(
-            ScoreCalculator.calculateUserScores([repoData]),
-            sortBy as SupportedSortBy,
-            sortOrder as SupportedSortOrder,
-          );
-
-          // 저장소별 사용자 점수와 요약 정보를 파일로 출력합니다.
-          const subDir = `${owner}-${repoName}`;
-          const written = await writeOutputFiles(
-            formats as SupportedFormat[],
-            {
-              userScores: singleUserScores,
-              repoSummaries: [repoSummary],
-            },
-            outputDir,
-            subDir,
-          );
           console.log(`[${repoPath}] CSV 저장: ${written.csv}`);
-          if (written.txt) {
-            console.log(`[${repoPath}] TXT 저장: ${written.txt}`);
-          }
-          if (written.html) {
-            console.log(`[${repoPath}] HTML 저장: ${written.html}`);
-          }
-        } catch (error: unknown) {
-          const errorMessage =
-            error instanceof Error ? error.message : String(error);
-
+          if (written.txt) console.log(`[${repoPath}] TXT 저장: ${written.txt}`);
+          if (written.html) console.log(`[${repoPath}] HTML 저장: ${written.html}`);
+        } else {
+          hasFailure = true;
+          const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
           console.error(`오류: '${repoPath}'의 데이터를 가져올 수 없습니다.`);
-          console.error(`상세 원인: ${errorMessage}`);
-          process.exit(1);
+          console.error(`상세 원인: ${reason}`);
         }
+      });
+
+      // 단 하나의 저장소라도 통신에 실패했다면 수집 작업 안내 후 종료 코드로 즉시 반영
+      if (hasFailure) {
+        process.exit(1);
       }
 
-      // 모든 저장소 데이터를 합산하여 최종 사용자 점수를 계산합니다.
+      // 모든 저장소 데이터를 합산하여 최종 사용자 점수를 계산합니다. (입력 순서가 보장된 리스트 활용)
       const userScores = sortUserScores(
         ScoreCalculator.calculateUserScores(repoDataList),
         sortBy as SupportedSortBy,
