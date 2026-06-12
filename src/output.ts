@@ -449,11 +449,21 @@ const getDeadlineStatus = (
 export const printClaims = (claims: RepoClaims): void => {
   console.log(`\n[${claims.repoPath}]`);
 
+  // 1. 원본 배열을 변경하지 않도록 복사([...]) 후 issueNumber 오름차순 정렬
+  const sortedClaimed = [...claims.claimed].sort(
+    (a, b) => a.issueNumber - b.issueNumber,
+  );
+
+  const sortedUnclaimed = [...claims.unclaimed].sort(
+    (a, b) => a.issueNumber - b.issueNumber,
+  );
+
   console.log('선점된 이슈');
-  if (claims.claimed.length === 0) {
+  if (sortedClaimed.length === 0) {
     console.log('  (없음)');
   } else {
-    for (const c of claims.claimed) {
+    // 2. 기존 claims.claimed 대신 정렬된 sortedClaimed 배열을 순회하도록 변경
+    for (const c of sortedClaimed) {
       console.log(`- #${c.issueNumber} ${c.title}`);
       console.log(`  URL: ${c.url}`);
       if (c.claimedAt) {
@@ -473,10 +483,11 @@ export const printClaims = (claims: RepoClaims): void => {
   }
 
   console.log('\n미선점 이슈');
-  if (claims.unclaimed.length === 0) {
+  if (sortedUnclaimed.length === 0) {
     console.log('  (없음)');
   } else {
-    for (const u of claims.unclaimed) {
+    // 3. 기존 claims.unclaimed 대신 정렬된 sortedUnclaimed 배열을 순회하도록 변경
+    for (const u of sortedUnclaimed) {
       console.log(`- #${u.issueNumber} ${u.title}`);
       console.log(`  URL: ${u.url}`);
     }
