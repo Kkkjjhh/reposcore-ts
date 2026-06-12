@@ -202,6 +202,19 @@ cli
         pageSize,
       ) as FullGitHubService;
 
+      // 실제 데이터 수집 전에 모든 저장소가 GitHub에 존재하는지 한 번에 검증합니다.
+      const missingRepos =
+        await githubService.validateRepositoriesExist(parsedRepos);
+
+      if (missingRepos.length > 0) {
+        for (const repoPath of missingRepos) {
+          console.error(
+            `오류: 저장소 '${repoPath}'를 찾을 수 없거나 접근할 수 없습니다.`,
+          );
+        }
+        process.exit(1);
+      }
+
       // --claims 옵션이 있으면 점수 계산 대신 이슈 선점 현황만 조회합니다.
       if (isClaimsMode) {
         for (const {repoPath, owner, repoName} of parsedRepos) {
