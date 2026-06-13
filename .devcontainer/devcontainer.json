@@ -12,5 +12,6 @@
       ]
     }
   },
-  "postCreateCommand": "curl -fsSL https://bun.sh/install | bash && echo 'export BUN_INSTALL=\"$HOME/.bun\"' >> ~/.bashrc && echo 'export PATH=\"$HOME/.bun/bin:$PATH\"' >> ~/.bashrc"
+  // [개선] Bun 설치가 완료된 후, 파이썬 문서 빌드용 의존성(requirements.txt)도 일괄 자동 설치되도록 체이닝 추가
+  "postCreateCommand": "curl -fsSL https://bun.sh/install | bash && echo 'export BUN_INSTALL=\"$HOME/.bun\"' >> ~/.bashrc && echo 'export PATH=\"$HOME/.bun/bin:$PATH\"' >> ~/.bashrc && pip install -r requirements.txt"
 }
