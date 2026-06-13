@@ -120,18 +120,21 @@ cli
         "I'll take this",
       ];
 
-      const rawKeywords = Array.isArray(options.keywords)
-        ? options.keywords.join(',')
-        : typeof options.keywords === 'string'
-          ? options.keywords
-          : DEFAULT_KEYWORDS.join(',');
+      const rawKeywords =
+        Array.isArray(options.keywords) &&
+        options.keywords.length === 1 &&
+        options.keywords[0] === 'undefined'
+          ? DEFAULT_KEYWORDS.join(',')
+          : Array.isArray(options.keywords)
+            ? options.keywords.join(',')
+            : typeof options.keywords === 'string'
+              ? options.keywords
+              : DEFAULT_KEYWORDS.join(',');
 
       const claimKeywords = rawKeywords
         .split(',')
         .map(k => k.trim())
-        .filter(
-          keyword => keyword && keyword !== 'undefined' && keyword !== '0',
-        );
+        .filter(keyword => keyword && keyword !== '0');
 
       if (isClaimsMode && claimKeywords.length === 0) {
         errors.push(
