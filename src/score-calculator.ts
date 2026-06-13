@@ -31,6 +31,15 @@ export interface UserScore {
 }
 
 /**
+ * 점수 산정 시 적용되는 한도 계산 결과입니다.
+ */
+export interface ScoreLimits {
+  maxAdditionalPr: number;
+  validPrCount: number;
+  maxIssueCount: number;
+}
+
+/**
  * 저장소의 이슈와 PR 데이터를 기반으로 사용자별 기여 점수를 계산하는 클래스입니다.
  */
 export class ScoreCalculator {
@@ -39,6 +48,9 @@ export class ScoreCalculator {
   private static readonly PR_TYPO_WEIGHT = 1;
   private static readonly ISSUE_FEATURE_BUG_WEIGHT = 2;
   private static readonly ISSUE_DOCS_WEIGHT = 1;
+
+  public static readonly MAX_DOCS_TYPO_PR_RATIO = 3;
+  public static readonly MAX_ISSUE_RATIO = 4;
 
   /**
    * 저장소의 이슈와 PR 데이터를 사용자별 점수 계산 데이터로 변환합니다.
@@ -116,30 +128,22 @@ export class ScoreCalculator {
   }
 
   /**
-   * 주어진 사용자 기여 데이터에서 점수 산정에 반영할 유효 PR 개수를 계산합니다.
+   * 사용자별 기여 데이터에서 점수 산정 한도를 계산합니다.
    *
-   * @param data 사용자별 이슈와 PR 기여 데이터
-   * @returns 점수 산정에 반영되는 유효 PR 개수
+   * @param data 사용자별 이슈와 PR 기여 데이터 (필요 필드만)
+   * @returns 한도 계산 결과 (문서/오타 PR 최대 한도, 유효 PR 개수, 최대 인정 이슈 개수)
    */
-  private static calculateValidPrCount(data: IssuePrData): number {
-    const pFb = data.prFeatureBug;
-    const pDocsAndTypo = data.prDocs + data.prTypo;
-    return pFb + Math.min(pDocsAndTypo, 3 * Math.max(pFb, 1));
-  }
+  public static calculateLimits(
+    data: Pick<IssuePrData, 'prFeatureBug' | 'prDocs' | 'prTypo'>,
+  ): ScoreLimits {
+    const maxAdditionalPr =
+      ScoreCalculator.MAX_DOCS_TYPO_PR_RATIO * Math.max(data.prFeatureBug, 1);
+    const totalDocTypoPr = data.prDocs + data.prTypo;
+    const validPrCount =
+      data.prFeatureBug + Math.min(totalDocTypoPr, maxAdditionalPr);
+    const maxIssueCount = ScoreCalculator.MAX_ISSUE_RATIO * validPrCount;
 
-  /**
-   * 사용자 기여 데이터와 유효 PR 개수를 기반으로 점수 산정에 반영할 유효 이슈 개수를 계산합니다.
-   *
-   * @param data 사용자별 이슈와 PR 기여 데이터
-   * @param validPrCount 점수 산정에 반영되는 유효 PR 개수
-   * @returns 점수 산정에 반영되는 유효 이슈 개수
-   */
-  private static calculateValidIssueCount(
-    data: IssuePrData,
-    validPrCount: number,
-  ): number {
-    const totalIssues = data.issueFeatureBug + data.issueDocs;
-    return Math.min(totalIssues, 4 * validPrCount);
+    return {maxAdditionalPr, validPrCount, maxIssueCount};
   }
 
   /**
@@ -149,10 +153,11 @@ export class ScoreCalculator {
    * @returns 계산된 최종 기여 점수
    */
   private static calculateFinalScore(data: IssuePrData): number {
-    const validPrCount = ScoreCalculator.calculateValidPrCount(data);
-    const validIssueCount = ScoreCalculator.calculateValidIssueCount(
-      data,
-      validPrCount,
+    const limits = ScoreCalculator.calculateLimits(data);
+    const validPrCount = limits.validPrCount;
+    const validIssueCount = Math.min(
+      data.issueFeatureBug + data.issueDocs,
+      limits.maxIssueCount,
     );
 
     const acceptedPrFeatureBug = Math.min(data.prFeatureBug, validPrCount);

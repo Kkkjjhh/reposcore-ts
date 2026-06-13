@@ -194,36 +194,35 @@ export const buildUserScoresTxt = (
       `${totalPrs} (${row.prDocs}/${row.prFeatureBug}/${row.prTypo})`,
     ]);
 
-    const maxAdditionalPr = 3 * Math.max(row.prFeatureBug, 1);
+    const limits = ScoreCalculator.calculateLimits(row);
     const totalDocTypoPr = row.prDocs + row.prTypo;
-    const rejectedPr = Math.max(0, totalDocTypoPr - maxAdditionalPr);
-    const validPrCount =
-      row.prFeatureBug + Math.min(totalDocTypoPr, maxAdditionalPr);
-    const maxIssueCount = 4 * validPrCount;
-    const rejectedIssue = Math.max(0, totalIssues - maxIssueCount);
+    const rejectedPr = Math.max(0, totalDocTypoPr - limits.maxAdditionalPr);
+    const rejectedIssue = Math.max(0, totalIssues - limits.maxIssueCount);
 
     if (rejectedPr > 0 || rejectedIssue > 0) {
       const userRejections = [
         `${row.userId}:`,
-        `    [미인정 항목] 문서/오타 PR ${rejectedPr}개 초과(한도 ${maxAdditionalPr}개) / 이슈 ${rejectedIssue}개 초과(한도 ${maxIssueCount}개)`,
+        `    [미인정 항목] 문서/오타 PR ${rejectedPr}개 초과(한도 ${limits.maxAdditionalPr}개) / 이슈 ${rejectedIssue}개 초과(한도 ${limits.maxIssueCount}개)`,
       ];
 
       if (rejectedPr > 0) {
-        const docSuggestionCount = Math.ceil(rejectedPr / 3);
+        const docRatio = ScoreCalculator.MAX_DOCS_TYPO_PR_RATIO;
+        const docSuggestionCount = Math.ceil(rejectedPr / docRatio);
         userRejections.push(
-          `    [추가 제안] 기능/버그 PR ${docSuggestionCount}개 추가 시 문서PR 인정 한도 +${docSuggestionCount * 3}`,
+          `    [추가 제안] 기능/버그 PR ${docSuggestionCount}개 추가 시 문서PR 인정 한도 +${docSuggestionCount * docRatio}`,
         );
       }
 
       if (rejectedIssue > 0) {
-        const issueSuggestionCount = Math.ceil(rejectedIssue / 4);
-        if (totalDocTypoPr < maxAdditionalPr) {
+        const issueRatio = ScoreCalculator.MAX_ISSUE_RATIO;
+        const issueSuggestionCount = Math.ceil(rejectedIssue / issueRatio);
+        if (totalDocTypoPr < limits.maxAdditionalPr) {
           userRejections.push(
-            `    [추가 제안] 문서 PR ${issueSuggestionCount}개 추가 혹은 기능/버그 PR ${issueSuggestionCount}개 추가시 이슈 인정한도 +${issueSuggestionCount * 4}`,
+            `    [추가 제안] 문서 PR ${issueSuggestionCount}개 추가 혹은 기능/버그 PR ${issueSuggestionCount}개 추가시 이슈 인정한도 +${issueSuggestionCount * issueRatio}`,
           );
         } else {
           userRejections.push(
-            `    [추가 제안] 기능/버그 PR ${issueSuggestionCount}개 추가시 이슈 인정한도 +${issueSuggestionCount * 4}`,
+            `    [추가 제안] 기능/버그 PR ${issueSuggestionCount}개 추가시 이슈 인정한도 +${issueSuggestionCount * issueRatio}`,
           );
         }
       }

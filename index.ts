@@ -219,15 +219,17 @@ cli
 
       // --claims 옵션이 있으면 점수 계산 대신 이슈 선점 현황만 조회합니다.
       if (isClaimsMode) {
-        const claimTasks = parsedRepos.map(async ({repoPath, owner, repoName}) => {
-          return await githubService.getRecentClaimsData(
-            owner,
-            repoName,
-            claimKeywords,
-            repoPath,
-            useCache,
-          );
-        });
+        const claimTasks = parsedRepos.map(
+          async ({repoPath, owner, repoName}) => {
+            return await githubService.getRecentClaimsData(
+              owner,
+              repoName,
+              claimKeywords,
+              repoPath,
+              useCache,
+            );
+          },
+        );
 
         const claimResults = await Promise.allSettled(claimTasks);
         let hasClaimFailure = false;
@@ -238,8 +240,13 @@ cli
             printClaims(result.value);
           } else {
             hasClaimFailure = true;
-            const msg = result.reason instanceof Error ? result.reason.message : String(result.reason);
-            console.error(`오류: '${repoPath}'의 선점 현황을 조회할 수 없습니다. (${msg})`);
+            const msg =
+              result.reason instanceof Error
+                ? result.reason.message
+                : String(result.reason);
+            console.error(
+              `오류: '${repoPath}'의 선점 현황을 조회할 수 없습니다. (${msg})`,
+            );
           }
         });
 
@@ -261,7 +268,11 @@ cli
           {since},
         );
 
-        const repoData = ScoreCalculator.calculateRepoData(detailed, owner, repoName);
+        const repoData = ScoreCalculator.calculateRepoData(
+          detailed,
+          owner,
+          repoName,
+        );
         const repoSummary = summarizeRepo(repoPath, detailed);
 
         const singleUserScores = sortUserScores(
@@ -294,14 +305,19 @@ cli
         if (result.status === 'fulfilled') {
           const {repoData, repoSummary, written} = result.value;
           repoDataList.push(repoData);
-          summaries: repoSummaries.push(repoSummary);
+          repoSummaries.push(repoSummary);
 
           console.log(`[${repoPath}] CSV 저장: ${written.csv}`);
-          if (written.txt) console.log(`[${repoPath}] TXT 저장: ${written.txt}`);
-          if (written.html) console.log(`[${repoPath}] HTML 저장: ${written.html}`);
+          if (written.txt)
+            console.log(`[${repoPath}] TXT 저장: ${written.txt}`);
+          if (written.html)
+            console.log(`[${repoPath}] HTML 저장: ${written.html}`);
         } else {
           hasFailure = true;
-          const reason = result.reason instanceof Error ? result.reason.message : String(result.reason);
+          const reason =
+            result.reason instanceof Error
+              ? result.reason.message
+              : String(result.reason);
           console.error(`오류: '${repoPath}'의 데이터를 가져올 수 없습니다.`);
           console.error(`상세 원인: ${reason}`);
         }
