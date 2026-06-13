@@ -61,9 +61,13 @@ cli
     default: 'desc',
   })
   .option('--claims', '최근 이슈 선점 현황을 조회합니다')
-  .option('--keywords [items]', '이슈 선점 키워드 목록(쉼표 구분)', {
-    default: "제가 하겠습니다,진행하겠습니다,할게요,I'll take this",
-  })
+  .option(
+    '--keywords [items]',
+    "이슈 선점 키워드 목록(쉼표 구분, 기본값: 제가 하겠습니다,진행하겠습니다,할게요,I'll take this)",
+    {
+      type: [String],
+    },
+  )
   .option('--page-size <number>', '한 번에 가져올 항목 수 (1~100)', {
     default: '$PAGE_SIZE',
   })
@@ -79,7 +83,7 @@ cli
         sortBy: string;
         sortOrder: string;
         claims?: boolean;
-        keywords?: string;
+        keywords?: string | string[];
         pageSize?: number | string;
       },
     ) => {
@@ -116,13 +120,27 @@ cli
         "I'll take this",
       ];
 
-      const claimKeywords =
-        typeof options.keywords === 'string'
-          ? options.keywords
-              .split(',')
-              .map(k => k.trim())
-              .filter(Boolean)
-          : DEFAULT_KEYWORDS;
+      const rawKeywords =
+        Array.isArray(options.keywords) &&
+        options.keywords.length === 1 &&
+        options.keywords[0] === 'undefined'
+          ? DEFAULT_KEYWORDS.join(',')
+          : Array.isArray(options.keywords)
+            ? options.keywords.join(',')
+            : typeof options.keywords === 'string'
+              ? options.keywords
+              : DEFAULT_KEYWORDS.join(',');
+
+      const claimKeywords = rawKeywords
+        .split(',')
+        .map(k => k.trim())
+        .filter(keyword => keyword && keyword !== '0');
+
+      if (isClaimsMode && claimKeywords.length === 0) {
+        errors.push(
+          '오류: --keywords에는 하나 이상의 선점 키워드를 입력해야 합니다.',
+        );
+      }
 
       const parsedRepos: {
         repoPath: string;
